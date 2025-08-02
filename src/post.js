@@ -32,24 +32,44 @@ async function run() {
     const trafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
     const pidFile = path.join(trafficDir, 'mitmdump.pid');
 
+    core.info(`Looking for PID file at: ${pidFile}`);
+    
     if (fs.existsSync(pidFile)) {
       const pid = fs.readFileSync(pidFile, 'utf8').trim();
       core.info(`Stopping mitmdump process (PID: ${pid})...`);
       
       try {
-        // Try to kill the process gracefully
-        await exec.exec('kill', ['-TERM', pid], { ignoreReturnCode: true });
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        // Check if process is still running first
+        const { exitCode } = await exec.getExecOutput('kill', ['-0', pid], { ignoreReturnCode: true });
+        if (exitCode === 0) {
+          // Process is running, try to kill it gracefully
+          await exec.exec('kill', ['-TERM', pid], { ignoreReturnCode: true });
+          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+          
+          // Check if still running and force kill if needed
+          const { exitCode: stillRunning } = await exec.getExecOutput('kill', ['-0', pid], { ignoreReturnCode: true });
+          if (stillRunning === 0) {
+            await exec.exec('kill', ['-KILL', pid], { ignoreReturnCode: true });
+          }
+        }
         
-        // Force kill if still running
-        await exec.exec('kill', ['-KILL', pid], { ignoreReturnCode: true });
-        fs.unlinkSync(pidFile);
+        // Clean up PID file
+        if (fs.existsSync(pidFile)) {
+          fs.unlinkSync(pidFile);
+        }
         core.info('mitmdump stopped successfully');
       } catch (error) {
         core.warning(`Error stopping mitmdump: ${error.message}`);
       }
     } else {
-      core.info('No PID file found, mitmdump may not have been started');
+      core.info(`No PID file found at ${pidFile}. Checking if traffic directory exists...`);
+      if (fs.existsSync(trafficDir)) {
+        core.info(`Traffic directory exists: ${trafficDir}`);
+        const files = fs.readdirSync(trafficDir);
+        core.info(`Files in traffic directory: ${files.join(', ')}`);
+      } else {
+        core.info(`Traffic directory does not exist: ${trafficDir}`);
+      }
     }
 
     // Now prepare and upload artifacts
@@ -60,6 +80,18 @@ async function run() {
     let actualTrafficFile = trafficFile;
     if (!actualTrafficFile && fs.existsSync(path.join(trafficDir, 'traffic_file_path.txt'))) {
       actualTrafficFile = fs.readFileSync(path.join(trafficDir, 'traffic_file_path.txt'), 'utf8').trim();
+    }
+
+    // Also check for any .mitm files in the traffic directory
+    if (!actualTrafficFile || !fs.existsSync(actualTrafficFile)) {
+      core.info('Checking for any traffic files in directory...');
+      if (fs.existsSync(trafficDir)) {
+        const mitmFiles = fs.readdirSync(trafficDir).filter(f => f.endsWith('.mitm'));
+        if (mitmFiles.length > 0) {
+          actualTrafficFile = path.join(trafficDir, mitmFiles[0]);
+          core.info(`Found traffic file: ${actualTrafficFile}`);
+        }
+      }
     }
 
     if (!actualTrafficFile || !fs.existsSync(actualTrafficFile)) {
@@ -114,25 +146,40 @@ async function run() {
       const files = fs.readdirSync(artifactDir).map(file => path.join(artifactDir, file));
       
       core.info(`Uploading artifacts: ${files.map(f => path.basename(f)).join(', ')}`);
+      core.info(`Artifact root directory: ${artifactDir}`);
+      core.info(`Total files to upload: ${files.length}`);
       
-      const uploadResponse = await artifactClient.uploadArtifact(
-        archiveName,
-        files,
-        {
-          rootDirectory: artifactDir,
-          continueOnError: false
+      // Check if files exist and are readable
+      for (const file of files) {
+        if (!fs.existsSync(file)) {
+          throw new Error(`File does not exist: ${file}`);
         }
+        const stats = fs.statSync(file);
+        core.info(`File ${path.basename(file)}: ${stats.size} bytes`);
+      }
+      
+      // Use the correct API call format for @actions/artifact v2.x
+      const uploadResponse = await artifactClient.uploadArtifact(
+        archiveName,      // artifact name
+        files,           // files to upload
+        artifactDir      // root directory
       );
 
       if (uploadResponse.failedItems && uploadResponse.failedItems.length > 0) {
         core.warning(`Some files failed to upload: ${uploadResponse.failedItems.join(', ')}`);
       } else {
         core.info(`Successfully uploaded artifact: ${archiveName}`);
-        core.info(`Artifact ID: ${uploadResponse.id}`);
-        core.info(`Artifact size: ${uploadResponse.size} bytes`);
+        if (uploadResponse.id) {
+          core.info(`Artifact ID: ${uploadResponse.id}`);
+        }
+        if (uploadResponse.size) {
+          core.info(`Artifact size: ${uploadResponse.size} bytes`);
+        }
       }
     } catch (error) {
       core.setFailed(`Failed to upload artifacts: ${error.message}`);
+      // Log more details for debugging
+      core.info(`Artifact directory contents: ${fs.existsSync(artifactDir) ? fs.readdirSync(artifactDir).join(', ') : 'directory does not exist'}`);
       return;
     }
 
