@@ -1,6 +1,6 @@
 # mitmproxy-logger-action
 
-A GitHub Action that starts mitmproxy to log HTTP/HTTPS traffic during your workflow and uploads the traffic data as an encrypted artifact.
+A GitHub Action that automatically captures HTTP/HTTPS traffic using mitmproxy during your workflow and uploads the traffic data as encrypted artifacts. The action handles the complete lifecycle - from installing and starting the proxy to stopping it and uploading artifacts when your job completes.
 
 ## Features
 
@@ -27,6 +27,7 @@ jobs:
       
       # Start mitmproxy logging
       - name: Start mitmproxy
+        id: mitmproxy
         uses: yaegashi/mitmproxy-logger-action@v1
         with:
           enabled: true
@@ -38,33 +39,20 @@ jobs:
       - name: Run tests
         run: |
           # Configure your application to use the proxy
-          export HTTP_PROXY=http://127.0.0.1:8080
-          export HTTPS_PROXY=http://127.0.0.1:8080
+          export HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          export HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
           # Run your tests
           npm test
       
-      # Stop mitmproxy and upload artifacts
-      - name: Stop mitmproxy
-        if: always()
-        uses: yaegashi/mitmproxy-logger-action/stop@v1
-        with:
-          enabled: true
-      
-      - name: Prepare traffic artifacts
-        if: always()
-        id: artifacts
-        uses: yaegashi/mitmproxy-logger-action/upload@v1
-        with:
-          enabled: true
-          passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
-      
-      - name: Upload artifacts to GitHub
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mitmproxy-traffic
-          path: ${{ steps.artifacts.outputs.artifact-path }}
+      # mitmproxy will automatically stop and upload artifacts when the job completes
 ```
+
+The action automatically handles:
+- Installing mitmproxy dependencies (pre-step)
+- Starting the proxy server (pre-step)  
+- Stopping the proxy server (post-step)
+- Compressing and encrypting traffic files (post-step)
+- Uploading artifacts to GitHub Actions (post-step)
 
 ## Inputs
 

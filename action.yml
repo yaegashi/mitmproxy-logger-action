@@ -1,5 +1,5 @@
 name: 'mitmproxy-logger-action'
-description: 'Start mitmproxy to log HTTP/HTTPS traffic and upload as encrypted artifact'
+description: 'Automatically capture HTTP/HTTPS traffic with mitmproxy and upload as encrypted artifacts'
 author: 'yaegashi'
 
 inputs:
@@ -22,23 +22,14 @@ inputs:
 outputs:
   proxy-url:
     description: 'URL of the started proxy'
-    value: ${{ steps.start.outputs.proxy-url }}
   traffic-file:
     description: 'Path to the traffic log file'
-    value: ${{ steps.start.outputs.traffic-file }}
 
 runs:
-  using: 'composite'
-  steps:
-    - name: Start mitmproxy
-      id: start
-      shell: bash
-      run: ${{ github.action_path }}/scripts/start.sh
-      env:
-        INPUT_ENABLED: ${{ inputs.enabled }}
-        INPUT_LISTEN_HOST: ${{ inputs.listen-host }}
-        INPUT_LISTEN_PORT: ${{ inputs.listen-port }}
-        INPUT_PASSPHRASE: ${{ inputs.passphrase }}
+  using: 'node20'
+  pre: 'pre.js'
+  main: 'index.js'
+  post: 'post.js'
 
 branding:
   icon: 'globe'

@@ -38,26 +38,4 @@ jobs:
           # python -m pytest
           # etc.
       
-      # Stop mitmproxy and prepare artifacts
-      - name: Stop mitmproxy
-        if: always()
-        uses: yaegashi/mitmproxy-logger-action/stop@v1
-        with:
-          enabled: true
-      
-      - name: Prepare traffic artifacts
-        if: always()
-        id: artifacts
-        uses: yaegashi/mitmproxy-logger-action/upload@v1
-        with:
-          enabled: true
-          passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
-          traffic-file: ${{ steps.mitmproxy.outputs.traffic-file }}
-      
-      # Upload to GitHub artifacts
-      - name: Upload traffic artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mitmproxy-traffic
-          path: ${{ steps.artifacts.outputs.artifact-path }}
+      # mitmproxy will automatically stop and upload artifacts when the job completes
