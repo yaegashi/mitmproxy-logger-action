@@ -1,0 +1,36 @@
+name: 'mitmproxy-logger-action'
+description: 'Automatically capture HTTP/HTTPS traffic with mitmproxy and upload as encrypted artifacts'
+author: 'yaegashi'
+
+inputs:
+  enabled:
+    description: 'Enable mitmproxy logging (true/false)'
+    required: false
+    default: 'true'
+  listen-host:
+    description: 'Proxy listen address'
+    required: false
+    default: '127.0.0.1'
+  listen-port:
+    description: 'Proxy listen port'
+    required: false
+    default: '8080'
+  passphrase:
+    description: 'Passphrase for artifact encryption'
+    required: true
+
+outputs:
+  proxy-url:
+    description: 'URL of the started proxy'
+  traffic-file:
+    description: 'Path to the traffic log file'
+
+runs:
+  using: 'node20'
+  pre: 'dist/pre/index.js'
+  main: 'dist/main/index.js'
+  post: 'dist/post/index.js'
+
+branding:
+  icon: 'globe'
+  color: 'blue'
