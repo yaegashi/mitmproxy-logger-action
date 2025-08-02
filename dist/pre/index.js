@@ -27582,19 +27582,32 @@ async function run() {
     
     await exec.exec('bash', [scriptPath]);
     
-    // The script writes to $GITHUB_OUTPUT which is handled automatically by Actions
-    // But we need to save traffic file for the post action
+    // Read the outputs that the script wrote and set them properly for GitHub Actions
     if (enabled === 'true') {
       try {
         const workspaceDir = process.env.GITHUB_WORKSPACE;
-        const trafficFilePath = path.join(workspaceDir, 'mitmproxy-traffic', 'traffic_file_path.txt');
+        const trafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
+        
+        // Read traffic file path and save as state for post action
+        const trafficFilePath = path.join(trafficDir, 'traffic_file_path.txt');
         if (fs.existsSync(trafficFilePath)) {
           const trafficFile = fs.readFileSync(trafficFilePath, 'utf8').trim();
           core.saveState('traffic-file', trafficFile);
+          core.setOutput('traffic-file', trafficFile);
         }
+        
+        // Set the proxy URL output (the script creates this but we need to set it properly)
+        const proxyUrl = `http://${listenHost}:${listenPort}`;
+        core.setOutput('proxy-url', proxyUrl);
+        
+        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${fs.existsSync(trafficFilePath) ? fs.readFileSync(trafficFilePath, 'utf8').trim() : 'not found'}`);
       } catch (error) {
         core.warning(`Could not save traffic file state: ${error.message}`);
       }
+    } else {
+      // Set empty outputs when disabled
+      core.setOutput('proxy-url', '');
+      core.setOutput('traffic-file', '');
     }
   } catch (error) {
     core.setFailed(`Pre action failed: ${error.message}`);
