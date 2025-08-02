@@ -4,8 +4,8 @@ mitmproxy-traffic/
 *.tar.gz
 *.enc
 
-# Node.js
-node_modules/
+# Node.js (except for action dependencies)
+# node_modules/
 package-lock.json
 
 # Python cache
