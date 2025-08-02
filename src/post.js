@@ -110,7 +110,7 @@ async function run() {
 
     // Upload artifacts using GitHub Actions artifact API
     try {
-      const artifactClient = new artifact.DefaultArtifactClient();
+      const artifactClient = artifact.create();
       const files = fs.readdirSync(artifactDir).map(file => path.join(artifactDir, file));
       
       core.info(`Uploading artifacts: ${files.map(f => path.basename(f)).join(', ')}`);
