@@ -18,7 +18,7 @@ async function run() {
     process.env.INPUT_PASSPHRASE = passphrase;
 
     // Get the action path and run the start script
-    const actionPath = process.env.GITHUB_ACTION_PATH || __dirname;
+    const actionPath = process.env.GITHUB_ACTION_PATH || path.resolve(__dirname, '..');
     const scriptPath = path.join(actionPath, 'scripts', 'start.sh');
     
     await exec.exec('bash', [scriptPath]);
