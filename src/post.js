@@ -118,8 +118,8 @@ async function run() {
       const uploadResponse = await artifactClient.uploadArtifact(
         archiveName,
         files,
-        artifactDir,
         {
+          rootDirectory: artifactDir,
           continueOnError: false
         }
       );
