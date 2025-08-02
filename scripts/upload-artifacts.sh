@@ -24,6 +24,7 @@ fi
 
 if [ -z "$TRAFFIC_FILE" ] || [ ! -f "$TRAFFIC_FILE" ]; then
     echo "No traffic file found. Creating an empty one for completeness..."
+    mkdir -p "$TRAFFIC_DIR"
     TRAFFIC_FILE="${TRAFFIC_DIR}/traffic_empty.mitm"
     touch "$TRAFFIC_FILE"
 fi

@@ -134,10 +134,58 @@ mitmweb -r traffic_*.mitm
 
 ## Troubleshooting
 
-- Ensure your application is configured to use the proxy
-- Check that the specified port is not already in use
-- Verify that the passphrase secret is properly configured
-- Review the mitmdump logs in the uploaded artifacts for debugging
+### Common Issues
+
+1. **Proxy connection failed**
+   - Ensure the specified port is not already in use
+   - Check if your application supports HTTP_PROXY/HTTPS_PROXY environment variables
+   - Verify the proxy is running with `curl -x http://127.0.0.1:8080 http://httpbin.org/get`
+
+2. **No traffic captured**
+   - Make sure your application is configured to use the proxy
+   - Check that HTTP_PROXY and HTTPS_PROXY environment variables are set
+   - Some applications may need additional proxy configuration
+
+3. **Certificate errors (HTTPS)**
+   - mitmproxy generates its own CA certificate
+   - For HTTPS traffic, applications may need to accept the mitmproxy CA
+   - The CA certificate is available in the traffic artifacts
+
+4. **Missing passphrase secret**
+   - Create a secret in your repository: Settings → Secrets → Actions
+   - Add a new secret named `MITMPROXY_PASSPHRASE` with your chosen passphrase
+   - Reference it in your workflow as `${{ secrets.MITMPROXY_PASSPHRASE }}`
+
+5. **Permission denied errors**
+   - The action requires write permissions to create temporary files
+   - Ensure your workflow has sufficient permissions
+
+### Debug Information
+
+To see detailed logs, check the uploaded artifacts which include:
+- `mitmdump.log` - mitmproxy startup and operation logs
+- Traffic data file with all captured HTTP/HTTPS requests
+
+### Testing Locally
+
+You can test the scripts locally (outside GitHub Actions):
+```bash
+export GITHUB_WORKSPACE="/tmp/test"
+export INPUT_ENABLED="true"
+export INPUT_LISTEN_HOST="127.0.0.1"
+export INPUT_LISTEN_PORT="8080"
+export INPUT_PASSPHRASE="your-test-passphrase"
+
+# Start mitmproxy
+./scripts/start.sh
+
+# Test proxy
+curl -x http://127.0.0.1:8080 http://httpbin.org/get
+
+# Stop and upload
+./scripts/stop.sh
+./scripts/upload-artifacts.sh
+```
 
 ## License
 

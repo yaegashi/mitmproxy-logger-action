@@ -1,0 +1,63 @@
+name: Example usage of mitmproxy-logger-action
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-with-mitmproxy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      # Start mitmproxy logging
+      - name: Start mitmproxy
+        id: mitmproxy
+        uses: yaegashi/mitmproxy-logger-action@v1
+        with:
+          enabled: true
+          listen-host: '127.0.0.1'
+          listen-port: '8080'
+          passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+      
+      # Configure your application to use the proxy
+      - name: Run tests with proxy
+        run: |
+          # Set proxy environment variables
+          export HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          export HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          
+          # Example: test HTTP requests
+          curl http://httpbin.org/get
+          curl https://httpbin.org/get
+          
+          # Your actual test commands would go here
+          # npm test
+          # python -m pytest
+          # etc.
+      
+      # Stop mitmproxy and prepare artifacts
+      - name: Stop mitmproxy
+        if: always()
+        uses: yaegashi/mitmproxy-logger-action/stop@v1
+        with:
+          enabled: true
+      
+      - name: Prepare traffic artifacts
+        if: always()
+        id: artifacts
+        uses: yaegashi/mitmproxy-logger-action/upload@v1
+        with:
+          enabled: true
+          passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+          traffic-file: ${{ steps.mitmproxy.outputs.traffic-file }}
+      
+      # Upload to GitHub artifacts
+      - name: Upload traffic artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitmproxy-traffic
+          path: ${{ steps.artifacts.outputs.artifact-path }}
