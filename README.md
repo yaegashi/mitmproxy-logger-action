@@ -1,1 +1,144 @@
 # mitmproxy-logger-action
+
+A GitHub Action that starts mitmproxy to log HTTP/HTTPS traffic during your workflow and uploads the traffic data as an encrypted artifact.
+
+## Features
+
+- Starts mitmdump proxy on specified host/port
+- Logs all HTTP/HTTPS traffic to a file
+- Compresses and encrypts traffic logs with a passphrase
+- Uploads traffic data as GitHub Actions artifacts
+- Configurable proxy settings
+- Easy cleanup and artifact management
+
+## Usage
+
+### Basic Usage
+
+```yaml
+name: Test with mitmproxy logging
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Start mitmproxy logging
+      - name: Start mitmproxy
+        uses: yaegashi/mitmproxy-logger-action@v1
+        with:
+          enabled: true
+          listen-host: '127.0.0.1'
+          listen-port: '8080'
+          passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+      
+      # Your test steps that generate HTTP traffic
+      - name: Run tests
+        run: |
+          # Configure your application to use the proxy
+          export HTTP_PROXY=http://127.0.0.1:8080
+          export HTTPS_PROXY=http://127.0.0.1:8080
+          # Run your tests
+          npm test
+      
+      # Stop mitmproxy and upload artifacts
+      - name: Stop mitmproxy
+        if: always()
+        uses: yaegashi/mitmproxy-logger-action/stop@v1
+        with:
+          enabled: true
+      
+      - name: Prepare traffic artifacts
+        if: always()
+        id: artifacts
+        uses: yaegashi/mitmproxy-logger-action/upload@v1
+        with:
+          enabled: true
+          passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+      
+      - name: Upload artifacts to GitHub
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitmproxy-traffic
+          path: ${{ steps.artifacts.outputs.artifact-path }}
+```
+
+## Inputs
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `enabled` | Enable mitmproxy logging (true/false) | No | `true` |
+| `listen-host` | Proxy listen address | No | `127.0.0.1` |
+| `listen-port` | Proxy listen port | No | `8080` |
+| `passphrase` | Passphrase for artifact encryption | Yes | - |
+
+## Outputs
+
+| Output | Description |
+|--------|-------------|
+| `proxy-url` | URL of the started proxy (e.g., `http://127.0.0.1:8080`) |
+| `traffic-file` | Path to the traffic log file |
+
+## Security Notes
+
+- The `passphrase` input should be stored as a GitHub secret
+- Traffic files are encrypted using AES-256-CBC before upload
+- Temporary files are cleaned up after artifact creation
+- The proxy only listens on localhost by default
+
+## Decrypting Traffic Files
+
+To decrypt the uploaded traffic files:
+
+```bash
+# Download and extract the artifact
+unzip mitmproxy-traffic.zip
+cd artifacts/
+
+# Decrypt the file
+openssl enc -aes-256-cbc -d -pbkdf2 -in mitmproxy_traffic_*.tar.gz.enc -out decrypted.tar.gz
+# Enter your passphrase when prompted
+
+# Extract the traffic file
+tar -xzf decrypted.tar.gz
+
+# View traffic with mitmproxy
+mitmweb -r traffic_*.mitm
+```
+
+## Advanced Usage
+
+### Conditional Logging
+
+```yaml
+- name: Start mitmproxy
+  uses: yaegashi/mitmproxy-logger-action@v1
+  with:
+    enabled: ${{ github.event_name == 'pull_request' }}
+    passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+```
+
+### Custom Port Configuration
+
+```yaml
+- name: Start mitmproxy
+  uses: yaegashi/mitmproxy-logger-action@v1
+  with:
+    listen-host: '0.0.0.0'  # Listen on all interfaces
+    listen-port: '9090'     # Custom port
+    passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+```
+
+## Troubleshooting
+
+- Ensure your application is configured to use the proxy
+- Check that the specified port is not already in use
+- Verify that the passphrase secret is properly configured
+- Review the mitmdump logs in the uploaded artifacts for debugging
+
+## License
+
+This project is licensed under the MIT License.

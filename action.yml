@@ -1,0 +1,45 @@
+name: 'mitmproxy-logger-action'
+description: 'Start mitmproxy to log HTTP/HTTPS traffic and upload as encrypted artifact'
+author: 'yaegashi'
+
+inputs:
+  enabled:
+    description: 'Enable mitmproxy logging (true/false)'
+    required: false
+    default: 'true'
+  listen-host:
+    description: 'Proxy listen address'
+    required: false
+    default: '127.0.0.1'
+  listen-port:
+    description: 'Proxy listen port'
+    required: false
+    default: '8080'
+  passphrase:
+    description: 'Passphrase for artifact encryption'
+    required: true
+
+outputs:
+  proxy-url:
+    description: 'URL of the started proxy'
+    value: ${{ steps.start.outputs.proxy-url }}
+  traffic-file:
+    description: 'Path to the traffic log file'
+    value: ${{ steps.start.outputs.traffic-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Start mitmproxy
+      id: start
+      shell: bash
+      run: ${{ github.action_path }}/scripts/start.sh
+      env:
+        INPUT_ENABLED: ${{ inputs.enabled }}
+        INPUT_LISTEN_HOST: ${{ inputs.listen-host }}
+        INPUT_LISTEN_PORT: ${{ inputs.listen-port }}
+        INPUT_PASSPHRASE: ${{ inputs.passphrase }}
+
+branding:
+  icon: 'globe'
+  color: 'blue'
