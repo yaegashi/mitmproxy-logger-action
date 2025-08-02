@@ -110,7 +110,7 @@ async function run() {
 
     // Upload artifacts using GitHub Actions artifact API
     try {
-      const artifactClient = artifact.create();
+      const artifactClient = new artifact.DefaultArtifactClient();
       const files = fs.readdirSync(artifactDir).map(file => path.join(artifactDir, file));
       
       core.info(`Uploading artifacts: ${files.map(f => path.basename(f)).join(', ')}`);
@@ -128,7 +128,7 @@ async function run() {
         core.warning(`Some files failed to upload: ${uploadResponse.failedItems.join(', ')}`);
       } else {
         core.info(`Successfully uploaded artifact: ${archiveName}`);
-        core.info(`Artifact ID: ${uploadResponse.artifactId}`);
+        core.info(`Artifact ID: ${uploadResponse.id}`);
         core.info(`Artifact size: ${uploadResponse.size} bytes`);
       }
     } catch (error) {
