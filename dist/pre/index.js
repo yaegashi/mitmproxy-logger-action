@@ -27575,7 +27575,9 @@ async function run() {
     process.env.INPUT_PASSPHRASE = passphrase;
 
     // Get the action path and run the start script
-    const actionPath = process.env.GITHUB_ACTION_PATH || path.resolve(__dirname, '..');
+    // When running in GitHub Actions, GITHUB_ACTION_PATH points to the action root
+    // When building/testing locally, we need to go up from dist/pre to the repository root
+    const actionPath = process.env.GITHUB_ACTION_PATH || path.resolve(__dirname, '..', '..');
     const scriptPath = path.join(actionPath, 'scripts', 'start.sh');
     
     await exec.exec('bash', [scriptPath]);
