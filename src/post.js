@@ -21,21 +21,30 @@ async function run() {
     process.env.INPUT_ENABLED = enabled;
     process.env.INPUT_PASSPHRASE = passphrase;
     
-    // Get traffic file from state if available
+    // Get traffic file and PID from state if available
     const trafficFile = core.getState('traffic-file');
+    const savedPid = core.getState('mitmdump-pid');
+    const trafficDir = core.getState('traffic-dir') || path.join(process.env.GITHUB_WORKSPACE, 'mitmproxy-traffic');
+    
     if (trafficFile) {
       process.env.TRAFFIC_FILE = trafficFile;
+      core.info(`Using traffic file from state: ${trafficFile}`);
     }
 
-    // Stop mitmproxy first
-    const workspaceDir = process.env.GITHUB_WORKSPACE;
-    const trafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
+    // Stop mitmproxy first - try to use PID from state, fallback to file
     const pidFile = path.join(trafficDir, 'mitmdump.pid');
+    let pid = savedPid;
+
+    if (pid) {
+      core.info(`Using PID from state: ${pid}`);
+    } else if (fs.existsSync(pidFile)) {
+      pid = fs.readFileSync(pidFile, 'utf8').trim();
+      core.info(`Using PID from file: ${pid}`);
+    }
 
     core.info(`Looking for PID file at: ${pidFile}`);
     
-    if (fs.existsSync(pidFile)) {
-      const pid = fs.readFileSync(pidFile, 'utf8').trim();
+    if (pid) {
       core.info(`Stopping mitmdump process (PID: ${pid})...`);
       
       try {
@@ -62,7 +71,7 @@ async function run() {
         core.warning(`Error stopping mitmdump: ${error.message}`);
       }
     } else {
-      core.info(`No PID file found at ${pidFile}. Checking if traffic directory exists...`);
+      core.info(`No PID available. Checking if traffic directory exists...`);
       if (fs.existsSync(trafficDir)) {
         core.info(`Traffic directory exists: ${trafficDir}`);
         const files = fs.readdirSync(trafficDir);
@@ -76,10 +85,12 @@ async function run() {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const archiveName = `mitmproxy_traffic_${timestamp}`;
     
-    // Find the traffic file
+    // Find the traffic file - use state first, then fallback to file system search
     let actualTrafficFile = trafficFile;
+    
     if (!actualTrafficFile && fs.existsSync(path.join(trafficDir, 'traffic_file_path.txt'))) {
       actualTrafficFile = fs.readFileSync(path.join(trafficDir, 'traffic_file_path.txt'), 'utf8').trim();
+      core.info(`Found traffic file path in file: ${actualTrafficFile}`);
     }
 
     // Also check for any .mitm files in the traffic directory
