@@ -7,7 +7,7 @@ const os = require('os');
 async function installMitmproxyCertificate(trafficDir) {
   try {
     const certPath = path.join(trafficDir, 'mitmproxy-ca-cert.pem');
-    
+
     // Wait a bit more for certificate to be generated
     let attempts = 0;
     while (!fs.existsSync(certPath) && attempts < 10) {
@@ -15,17 +15,17 @@ async function installMitmproxyCertificate(trafficDir) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       attempts++;
     }
-    
+
     if (!fs.existsSync(certPath)) {
       core.warning('mitmproxy CA certificate not found, skipping installation');
       return;
     }
-    
+
     core.info(`Found CA certificate at: ${certPath}`);
-    
+
     // Install certificate based on platform
     const platform = os.platform();
-    
+
     if (platform === 'linux') {
       // Ubuntu/Debian - copy to ca-certificates directory
       try {
@@ -62,8 +62,11 @@ async function installMitmproxyCertificate(trafficDir) {
       try {
         core.info('Installing CA certificate to LocalMachine store');
         await exec.exec('certutil', ['-addstore', '-f', 'Root', certPath], { ignoreReturnCode: true });
-        core.info('Installing CA certificate to CurrentUser store');
-        await exec.exec('certutil', ['-user', '-addstore', '-f', 'Root', certPath], { ignoreReturnCode: true });
+        core.info('Installing CA certificate to CurrentUser store using PowerShell');
+        await exec.exec('powershell', [
+          '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+          `Import-Certificate -FilePath '${certPath}' -CertStoreLocation 'Cert:\\CurrentUser\\Root' -Confirm:$false`
+        ], { ignoreReturnCode: true });
         core.info('Successfully installed CA certificate on Windows');
       } catch (error) {
         core.warning(`Failed to install CA certificate on Windows: ${error.message}`);
@@ -71,12 +74,12 @@ async function installMitmproxyCertificate(trafficDir) {
     } else {
       core.warning(`Certificate installation not supported on platform: ${platform}`);
     }
-    
+
     // Also set environment variable for applications that respect it
     core.exportVariable('REQUESTS_CA_BUNDLE', certPath);
     core.exportVariable('SSL_CERT_FILE', certPath);
     core.info('Set CA certificate environment variables');
-    
+
   } catch (error) {
     core.warning(`Certificate installation failed: ${error.message}`);
   }
