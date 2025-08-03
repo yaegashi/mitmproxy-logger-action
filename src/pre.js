@@ -51,8 +51,9 @@ async function installMitmproxyCertificate(trafficDir) {
     } else if (platform === 'darwin') {
       // macOS - add to keychain
       try {
-        await exec.exec('sudo', ['security', 'add-trusted-cert', '-d', '-r', 'trustRoot', '-k', '/Library/Keychains/System.keychain', certPath], { ignoreReturnCode: true });
-        core.info('Successfully installed CA certificate on macOS');
+        // Use the user's login keychain instead of the system keychain, and do not use sudo
+        await exec.exec('security', ['add-trusted-cert', '-d', '-r', 'trustRoot', '-k', `${os.homedir()}/Library/Keychains/login.keychain-db`, certPath], { ignoreReturnCode: true });
+        core.info('Successfully installed CA certificate on macOS (user keychain)');
       } catch (error) {
         core.warning(`Failed to install CA certificate on macOS: ${error.message}`);
       }
