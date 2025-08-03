@@ -33,7 +33,7 @@ async function run() {
     // Create traffic directory in RUNNER_TEMP to avoid workspace cleanup issues
     const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
     const trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
-    
+
     fs.mkdirSync(trafficDir, { recursive: true });
 
     // Generate traffic file name with timestamp
@@ -55,35 +55,23 @@ async function run() {
       '--set', `confdir=${trafficDir}`
     ];
 
+    // Open log file for mitmdump stdout and stderr
     const logFd = fs.openSync(logFile, 'a');
 
-    // On Windows, we need to handle process spawning differently
-    let mitmdumpProcess;
-    if (os.platform() === 'win32') {
-      // Use spawn to get the process object for Windows
-      const { spawn } = require('child_process');
-      mitmdumpProcess = spawn('mitmdump', mitmdumpArgs, {
-        detached: false,
-        stdio: ['ignore', logFd, logFd]
-      });
+    // Spawn mitmdump process
+    const { spawn } = require('child_process');
+    const mitmdumpProcess = spawn('mitmdump', mitmdumpArgs, {
+      detached: true,
+      stdio: ['ignore', logFd, logFd]
+    });
 
-      // Save the PID for cleanup
-      fs.writeFileSync(pidFile, mitmdumpProcess.pid.toString());
-    } else {
-      // Use exec for Unix systems, redirecting output to log file
-      const { spawn } = require('child_process');
-      mitmdumpProcess = spawn('mitmdump', mitmdumpArgs, {
-        detached: true,
-        stdio: ['ignore', logFd, logFd]
-      });
+    // Save the PID for cleanup
+    fs.writeFileSync(pidFile, mitmdumpProcess.pid.toString());
 
-      // Save the PID for cleanup
-      fs.writeFileSync(pidFile, mitmdumpProcess.pid.toString());
-      
-      // Unref the process so it doesn't keep the Node.js process alive
-      mitmdumpProcess.unref();
-    }
+    // Unref the process so it doesn't keep the Node.js process alive
+    mitmdumpProcess.unref();
 
+    // Close the log file descriptor to avoid leaks
     fs.closeSync(logFd);
 
     // Wait a moment for the proxy to start
