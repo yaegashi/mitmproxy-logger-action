@@ -25,11 +25,19 @@ async function run() {
     
     await exec.exec('bash', [scriptPath]);
     
-    // Read the outputs that the script wrote and set them properly for GitHub Actions
+    // The bash script sets outputs via $GITHUB_OUTPUT
+    // We also set them via core.setOutput() as a fallback to ensure they're available
     if (enabled === 'true') {
       try {
         const workspaceDir = process.env.GITHUB_WORKSPACE;
         const trafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
+        
+        // Wait a moment for the script to finish writing files
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Set the proxy URL output 
+        const proxyUrl = `http://${listenHost}:${listenPort}`;
+        core.setOutput('proxy-url', proxyUrl);
         
         // Read traffic file path and save as state for post action
         const trafficFilePath = path.join(trafficDir, 'traffic_file_path.txt');
@@ -37,15 +45,18 @@ async function run() {
           const trafficFile = fs.readFileSync(trafficFilePath, 'utf8').trim();
           core.saveState('traffic-file', trafficFile);
           core.setOutput('traffic-file', trafficFile);
+          core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${trafficFile}`);
+        } else {
+          core.warning(`Traffic file path not found at: ${trafficFilePath}`);
+          core.setOutput('traffic-file', '');
+          core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=`);
         }
-        
-        // Set the proxy URL output (the script creates this but we need to set it properly)
-        const proxyUrl = `http://${listenHost}:${listenPort}`;
-        core.setOutput('proxy-url', proxyUrl);
-        
-        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${fs.existsSync(trafficFilePath) ? fs.readFileSync(trafficFilePath, 'utf8').trim() : 'not found'}`);
       } catch (error) {
         core.warning(`Could not save traffic file state: ${error.message}`);
+        // Set basic outputs even if we can't read the traffic file
+        const proxyUrl = `http://${listenHost}:${listenPort}`;
+        core.setOutput('proxy-url', proxyUrl);
+        core.setOutput('traffic-file', '');
       }
     } else {
       // Set empty outputs when disabled
