@@ -29,8 +29,8 @@ jobs:
         run: |
           # With set-envvars: true (default), environment variables are automatically set
           # You can still override them if needed:
-          # export HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
-          # export HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          # export http_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
+          # export https_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
           
           # Example: test HTTP requests
           curl http://httpbin.org/get

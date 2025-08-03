@@ -36,8 +36,9 @@ jobs:
         run: |
           # With set-envvars: true (default), environment variables are automatically set
           # You can still override them if needed:
-          # $env:HTTP_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
-          # $env:HTTPS_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # $env:http_proxy = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # $env:https_proxy = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # $env:CURL_OPTIONS = "--ssl-no-revoke"
           
           # Example: test HTTP requests using PowerShell
           Invoke-WebRequest -Uri "http://httpbin.org/get" -UseBasicParsing
@@ -54,8 +55,9 @@ jobs:
         run: |
           REM Environment variables are already set by the action
           REM You can still set them manually if needed:
-          REM set HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
-          REM set HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          REM set http_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
+          REM set https_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
+          REM set CURL_OPTIONS=--ssl-no-revoke
           curl http://httpbin.org/get
           curl https://httpbin.org/get
         continue-on-error: true

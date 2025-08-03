@@ -198,8 +198,14 @@ async function run() {
       core.info('Setting proxy environment variables...');
       core.exportVariable('http_proxy', proxyUrl);
       core.exportVariable('https_proxy', proxyUrl);
-      core.exportVariable('CURL_OPTIONS', '--ssl-no-revoke');
-      core.info(`Set environment variables: http_proxy=${proxyUrl}, https_proxy=${proxyUrl}, CURL_OPTIONS=--ssl-no-revoke`);
+      
+      // Only set CURL_OPTIONS on Windows
+      if (os.platform() === 'win32') {
+        core.exportVariable('CURL_OPTIONS', '--ssl-no-revoke');
+        core.info(`Set environment variables: http_proxy=${proxyUrl}, https_proxy=${proxyUrl}, CURL_OPTIONS=--ssl-no-revoke`);
+      } else {
+        core.info(`Set environment variables: http_proxy=${proxyUrl}, https_proxy=${proxyUrl}`);
+      }
     }
 
     // Traffic file path and proxy URL are saved in state for later use
