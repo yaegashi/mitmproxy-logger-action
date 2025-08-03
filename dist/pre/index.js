@@ -27647,11 +27647,7 @@ async function run() {
     // Save outputs for JavaScript to read
     const proxyUrl = `http://${listenHost}:${listenPort}`;
 
-    // Save traffic file path for later use
-    fs.writeFileSync(path.join(trafficDir, 'traffic_file_path.txt'), trafficFile);
-
-    // Save proxy URL for JavaScript to read
-    fs.writeFileSync(path.join(trafficDir, 'proxy_url.txt'), proxyUrl);
+    // Traffic file path and proxy URL are saved in state for later use
 
     core.info(`mitmproxy started successfully at ${proxyUrl}`);
     core.info(`PID: ${mitmdumpProcess.pid}`);

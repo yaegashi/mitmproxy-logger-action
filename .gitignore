@@ -1,8 +1,10 @@
 # Test artifacts
 mitmproxy-traffic/
 *.mitm
+*.har
 *.tar.gz
 *.enc
+*.zip
 
 # Node.js
 node_modules/
