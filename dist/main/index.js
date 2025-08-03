@@ -27590,20 +27590,49 @@ async function run() {
         }
         core.setOutput('proxy-url', proxyUrl);
         
+        // Read PID and save as state for post action
+        const pidFilePath = path.join(trafficDir, 'mitmdump.pid');
+        let mitmproxyPid = '';
+        if (fs.existsSync(pidFilePath)) {
+          mitmproxyPid = fs.readFileSync(pidFilePath, 'utf8').trim();
+          core.saveState('mitmdump-pid', mitmproxyPid);
+          core.info(`Saved mitmdump PID: ${mitmproxyPid}`);
+        } else {
+          core.warning(`PID file not found at: ${pidFilePath}`);
+        }
+        
         // Read traffic file path and save as state for post action
         const trafficFilePath = path.join(trafficDir, 'traffic_file_path.txt');
+        let trafficFile = '';
         if (fs.existsSync(trafficFilePath)) {
-          const trafficFile = fs.readFileSync(trafficFilePath, 'utf8').trim();
+          trafficFile = fs.readFileSync(trafficFilePath, 'utf8').trim();
           core.saveState('traffic-file', trafficFile);
           core.setOutput('traffic-file', trafficFile);
-          core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${trafficFile}`);
+          core.info(`Saved traffic file path: ${trafficFile}`);
         } else {
           core.warning(`Traffic file path not found at: ${trafficFilePath}`);
-          core.setOutput('traffic-file', '');
-          core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=`);
+          // Try to find any .mitm files in the traffic directory as fallback
+          if (fs.existsSync(trafficDir)) {
+            const mitmFiles = fs.readdirSync(trafficDir).filter(f => f.endsWith('.mitm'));
+            if (mitmFiles.length > 0) {
+              trafficFile = path.join(trafficDir, mitmFiles[0]);
+              core.saveState('traffic-file', trafficFile);
+              core.setOutput('traffic-file', trafficFile);
+              core.info(`Found and saved traffic file: ${trafficFile}`);
+            } else {
+              core.setOutput('traffic-file', '');
+            }
+          } else {
+            core.setOutput('traffic-file', '');
+          }
         }
+        
+        // Save traffic directory path as well for post action
+        core.saveState('traffic-dir', trafficDir);
+        
+        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${trafficFile}`);
       } catch (error) {
-        core.warning(`Could not read traffic file state: ${error.message}`);
+        core.warning(`Could not set outputs from traffic files: ${error.message}`);
         // Set basic outputs even if we can't read the traffic file
         const proxyUrl = `http://${listenHost}:${listenPort}`;
         core.setOutput('proxy-url', proxyUrl);
