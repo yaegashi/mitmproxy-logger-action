@@ -187,94 +187,49 @@ async function run() {
     const artifactDir = path.join(trafficDir, 'artifacts');
     fs.mkdirSync(artifactDir, { recursive: true });
 
-    // Create ZIP archive with both .mitm and .har files
-    core.info('Creating ZIP archive...');
+    // Create encrypted ZIP archive with both .mitm and .har files
+    core.info('Creating password-protected ZIP archive...');
     const zipFile = path.join(artifactDir, `${archiveName}.zip`);
     
     await new Promise((resolve, reject) => {
       const zipArchive = new yazl.ZipFile();
       
-      // Add .mitm file
+      // Add .mitm file with encryption
       if (actualTrafficFile && fs.existsSync(actualTrafficFile)) {
-        zipArchive.addFile(actualTrafficFile, path.basename(actualTrafficFile));
-        core.info(`Added to ZIP: ${path.basename(actualTrafficFile)}`);
+        zipArchive.addFile(actualTrafficFile, path.basename(actualTrafficFile), {
+          password: passphrase
+        });
+        core.info(`Added encrypted to ZIP: ${path.basename(actualTrafficFile)}`);
       }
       
-      // Add .har file
+      // Add .har file with encryption
       if (harFile && fs.existsSync(harFile)) {
-        zipArchive.addFile(harFile, path.basename(harFile));
-        core.info(`Added to ZIP: ${path.basename(harFile)}`);
+        zipArchive.addFile(harFile, path.basename(harFile), {
+          password: passphrase
+        });
+        core.info(`Added encrypted to ZIP: ${path.basename(harFile)}`);
       }
       
-      // Add logs if available
+      // Add logs if available with encryption
       const logFile = path.join(trafficDir, 'mitmdump.log');
       if (fs.existsSync(logFile)) {
-        zipArchive.addFile(logFile, 'mitmdump.log');
-        core.info('Added mitmdump log file to ZIP');
+        zipArchive.addFile(logFile, 'mitmdump.log', {
+          password: passphrase
+        });
+        core.info('Added encrypted mitmdump log file to ZIP');
       }
       
       zipArchive.end();
       
       zipArchive.outputStream.pipe(fs.createWriteStream(zipFile))
         .on('close', () => {
-          core.info(`ZIP archive created: ${zipFile}`);
+          core.info(`Password-protected ZIP archive created: ${zipFile}`);
           resolve();
         })
         .on('error', reject);
     });
 
-    let finalFile = zipFile;
-
-    // Encrypt ZIP with password if passphrase is provided
-    if (passphrase) {
-      core.info('Creating password-protected ZIP archive...');
-      const encryptedZipFile = path.join(artifactDir, `${archiveName}_encrypted.zip`);
-      
-      await new Promise((resolve, reject) => {
-        const zipArchive = new yazl.ZipFile();
-        
-        // Add .mitm file with encryption
-        if (actualTrafficFile && fs.existsSync(actualTrafficFile)) {
-          zipArchive.addFile(actualTrafficFile, path.basename(actualTrafficFile), {
-            password: passphrase
-          });
-          core.info(`Added encrypted to ZIP: ${path.basename(actualTrafficFile)}`);
-        }
-        
-        // Add .har file with encryption
-        if (harFile && fs.existsSync(harFile)) {
-          zipArchive.addFile(harFile, path.basename(harFile), {
-            password: passphrase
-          });
-          core.info(`Added encrypted to ZIP: ${path.basename(harFile)}`);
-        }
-        
-        // Add logs if available with encryption
-        const logFile = path.join(trafficDir, 'mitmdump.log');
-        if (fs.existsSync(logFile)) {
-          zipArchive.addFile(logFile, 'mitmdump.log', {
-            password: passphrase
-          });
-          core.info('Added encrypted mitmdump log file to ZIP');
-        }
-        
-        zipArchive.end();
-        
-        zipArchive.outputStream.pipe(fs.createWriteStream(encryptedZipFile))
-          .on('close', () => {
-            core.info(`Password-protected ZIP archive created: ${encryptedZipFile}`);
-            // Remove unencrypted ZIP
-            if (fs.existsSync(zipFile)) {
-              fs.unlinkSync(zipFile);
-            }
-            finalFile = encryptedZipFile;
-            resolve();
-          })
-          .on('error', reject);
-      });
-    } else {
-      core.warning('No passphrase provided, ZIP file will not be password-protected');
-    }
+    const finalFile = zipFile;
 
     // Upload artifacts using GitHub Actions artifact API
     try {
