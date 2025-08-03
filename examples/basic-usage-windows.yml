@@ -26,15 +26,18 @@ jobs:
           enabled: true
           listen-host: '127.0.0.1'
           listen-port: '8080'
+          install-cacert: true
+          set-envvars: true
           passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
       
       # Configure your application to use the proxy
       - name: Run tests with proxy
         shell: powershell
         run: |
-          # Set proxy environment variables for PowerShell/Windows
-          $env:HTTP_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
-          $env:HTTPS_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # With set-envvars: true (default), environment variables are automatically set
+          # You can still override them if needed:
+          # $env:HTTP_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # $env:HTTPS_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
           
           # Example: test HTTP requests using PowerShell
           Invoke-WebRequest -Uri "http://httpbin.org/get" -UseBasicParsing
@@ -49,8 +52,10 @@ jobs:
       - name: Test with curl (if available)
         shell: cmd
         run: |
-          set HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
-          set HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          REM Environment variables are already set by the action
+          REM You can still set them manually if needed:
+          REM set HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          REM set HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
           curl http://httpbin.org/get
           curl https://httpbin.org/get
         continue-on-error: true

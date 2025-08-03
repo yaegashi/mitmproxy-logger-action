@@ -20,14 +20,17 @@ jobs:
           enabled: true
           listen-host: '127.0.0.1'
           listen-port: '8080'
+          install-cacert: true
+          set-envvars: true
           passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
       
       # Configure your application to use the proxy
       - name: Run tests with proxy
         run: |
-          # Set proxy environment variables
-          export HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
-          export HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          # With set-envvars: true (default), environment variables are automatically set
+          # You can still override them if needed:
+          # export HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          # export HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
           
           # Example: test HTTP requests
           curl http://httpbin.org/get

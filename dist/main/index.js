@@ -27613,14 +27613,24 @@ async function run() {
           core.warning('No traffic file found');
         }
         
-        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${trafficFile || ''}`);
+        // Get CA certificate path from state
+        const cacertPath = core.getState('mitmproxy-cacert-path') || '';
+        core.setOutput('cacert-path', cacertPath);
+        if (cacertPath) {
+          core.info(`Set CA certificate path output: ${cacertPath}`);
+        } else {
+          core.info('No CA certificate path available');
+        }
+        
+        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${trafficFile || ''}, cacert-path=${cacertPath}`);
       } catch (error) {
         core.warning(`Could not set outputs from state: ${error.message}`);
         // Set basic outputs even if we can't read the traffic file
         const proxyUrl = `http://${listenHost}:${listenPort}`;
         core.setOutput('proxy-url', proxyUrl);
         core.setOutput('traffic-file', '');
-        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=`);
+        core.setOutput('cacert-path', '');
+        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=, cacert-path=`);
       }
       
       core.info('Traffic will be automatically uploaded when the action completes.');
@@ -27629,6 +27639,7 @@ async function run() {
       // Set empty outputs when disabled
       core.setOutput('proxy-url', '');
       core.setOutput('traffic-file', '');
+      core.setOutput('cacert-path', '');
     }
   } catch (error) {
     core.setFailed(`Main action failed: ${error.message}`);
