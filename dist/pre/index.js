@@ -27617,12 +27617,9 @@ async function installMitmproxyCertificate(trafficDir) {
     } else if (platform === 'win32') {
       // Windows - add to certificate store
       try {
-        core.info('Installing CA certificate to LocalMachine store');
-        await exec.exec('certutil', ['-addstore', '-f', 'Root', certPath], { ignoreReturnCode: true });
-        core.info('Installing CA certificate to CurrentUser store using PowerShell');
         await exec.exec('powershell', [
           '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
-          `Import-Certificate -FilePath '${certPath}' -CertStoreLocation 'Cert:\\CurrentUser\\Root' -Confirm:$false`
+          `@('LocalMachine', 'CurrentUser') | ForEach-Object { Import-Certificate -FilePath '${certPath}' -CertStoreLocation "Cert:\\$_\\Root" -Confirm:$false }`
         ], { ignoreReturnCode: true });
         core.info('Successfully installed CA certificate on Windows');
       } catch (error) {
