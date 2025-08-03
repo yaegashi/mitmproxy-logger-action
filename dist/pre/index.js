@@ -27585,51 +27585,16 @@ async function run() {
       }
     });
     
-    // The bash script sets outputs via $GITHUB_OUTPUT
-    // We also set them via core.setOutput() as a fallback to ensure they're available
+    // Save state for main action to set outputs (outputs from pre are not accessible in workflows)
     if (enabled === 'true') {
-      try {
-        const workspaceDir = process.env.GITHUB_WORKSPACE;
-        const trafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
-        
-        // Wait a moment for the script to finish writing files
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Set the proxy URL output by reading from the file created by the script
-        const proxyUrlPath = path.join(trafficDir, 'proxy_url.txt');
-        let proxyUrl = '';
-        
-        if (fs.existsSync(proxyUrlPath)) {
-          proxyUrl = fs.readFileSync(proxyUrlPath, 'utf8').trim();
-        } else {
-          // Fallback to constructing the URL if file doesn't exist
-          proxyUrl = `http://${listenHost}:${listenPort}`;
-        }
-        core.setOutput('proxy-url', proxyUrl);
-        
-        // Read traffic file path and save as state for post action
-        const trafficFilePath = path.join(trafficDir, 'traffic_file_path.txt');
-        if (fs.existsSync(trafficFilePath)) {
-          const trafficFile = fs.readFileSync(trafficFilePath, 'utf8').trim();
-          core.saveState('traffic-file', trafficFile);
-          core.setOutput('traffic-file', trafficFile);
-          core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${trafficFile}`);
-        } else {
-          core.warning(`Traffic file path not found at: ${trafficFilePath}`);
-          core.setOutput('traffic-file', '');
-          core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=`);
-        }
-      } catch (error) {
-        core.warning(`Could not save traffic file state: ${error.message}`);
-        // Set basic outputs even if we can't read the traffic file
-        const proxyUrl = `http://${listenHost}:${listenPort}`;
-        core.setOutput('proxy-url', proxyUrl);
-        core.setOutput('traffic-file', '');
-      }
+      // Save inputs as state so main can access them
+      core.saveState('enabled', enabled);
+      core.saveState('listen-host', listenHost);
+      core.saveState('listen-port', listenPort);
+      core.info('mitmproxy setup completed, main action will set outputs');
     } else {
-      // Set empty outputs when disabled
-      core.setOutput('proxy-url', '');
-      core.setOutput('traffic-file', '');
+      core.saveState('enabled', 'false');
+      core.info('mitmproxy is disabled');
     }
   } catch (error) {
     core.setFailed(`Pre action failed: ${error.message}`);
