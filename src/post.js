@@ -145,14 +145,31 @@ async function run() {
       
       core.info('Converting .mitm to .har using mitmdump hardump...');
       try {
+        let mitmdumpStdout = '';
+        let mitmdumpStderr = '';
         await exec.exec('mitmdump', [
           '--no-server', 
           '--rfile', actualTrafficFile, 
           '--set', `hardump=${harFile}`
-        ]);
+        ], {
+          listeners: {
+            stdout: (data) => {
+              mitmdumpStdout += data.toString();
+            },
+            stderr: (data) => {
+              mitmdumpStderr += data.toString();
+            }
+          }
+        });
         core.info(`Successfully converted to HAR: ${harFile}`);
       } catch (error) {
         core.warning(`HAR conversion failed (mitmdump version may not support hardump): ${error.message}`);
+        if (typeof mitmdumpStderr !== 'undefined' && mitmdumpStderr.length > 0) {
+          core.warning(`mitmdump stderr: ${mitmdumpStderr}`);
+        }
+        if (typeof mitmdumpStdout !== 'undefined' && mitmdumpStdout.length > 0) {
+          core.info(`mitmdump stdout: ${mitmdumpStdout}`);
+        }
         // Create empty HAR file to ensure consistency
         const emptyHar = {
           log: {
