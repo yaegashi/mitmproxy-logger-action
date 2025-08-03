@@ -25,7 +25,7 @@ async function run() {
             trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
             core.info(`Constructed temporary traffic directory: ${trafficDir}`);
           } else {
-            throw new Error('Could not determine temporary directory path');
+            throw new Error('RUNNER_TEMP environment variable is not available and no temporary directory found in state');
           }
         } else {
           core.info(`Using temporary traffic directory from state: ${trafficDir}`);
