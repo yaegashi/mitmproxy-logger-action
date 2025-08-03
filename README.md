@@ -8,6 +8,7 @@ A GitHub Action that automatically captures HTTP/HTTPS traffic using mitmproxy d
 
 - Starts mitmdump proxy on specified host/port
 - Logs all HTTP/HTTPS traffic to a file
+- **Automatic CA certificate installation** for seamless HTTPS interception
 - Compresses and encrypts traffic logs with a passphrase
 - Uploads traffic data as GitHub Actions artifacts
 - Configurable proxy settings
@@ -37,6 +38,7 @@ jobs:
           enabled: true
           listen-host: '127.0.0.1'
           listen-port: '8080'
+          install-certificate: true
           passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
       
       # Your test steps that generate HTTP traffic
@@ -77,6 +79,7 @@ jobs:
           enabled: true
           listen-host: '127.0.0.1'
           listen-port: '8080'
+          install-certificate: true
           passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
       
       # Your test steps that generate HTTP traffic
@@ -106,6 +109,7 @@ The action automatically handles:
 | `enabled` | Enable mitmproxy logging (true/false) | No | `true` |
 | `listen-host` | Proxy listen address | No | `127.0.0.1` |
 | `listen-port` | Proxy listen port | No | `8080` |
+| `install-certificate` | Install mitmproxy CA certificate to system trust store (true/false) | No | `true` |
 | `passphrase` | Passphrase for artifact encryption | Yes | - |
 
 ## Outputs
@@ -114,6 +118,34 @@ The action automatically handles:
 |--------|-------------|
 | `proxy-url` | URL of the started proxy (e.g., `http://127.0.0.1:8080`) |
 | `traffic-file` | Path to the traffic log file |
+
+## Certificate Installation
+
+The action automatically installs mitmproxy's CA certificate to the system trust store when `install-certificate` is set to `true` (default). This enables seamless HTTPS traffic interception without certificate warnings.
+
+### Platform Support
+
+- **Ubuntu/Linux**: Installs to `/usr/local/share/ca-certificates/` and updates system CA bundle
+- **macOS**: Adds to System keychain as trusted root certificate  
+- **Windows**: Imports to Root certificate store using `certutil`
+
+### Environment Variables
+
+The action also sets these environment variables for applications that use them:
+- `REQUESTS_CA_BUNDLE`: For Python requests library
+- `SSL_CERT_FILE`: For curl and OpenSSL-based applications
+
+### Disabling Certificate Installation
+
+To disable automatic certificate installation:
+
+```yaml
+- name: Start mitmproxy
+  uses: yaegashi/mitmproxy-logger-action@v1
+  with:
+    install-certificate: false
+    passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+```
 
 ## Platform Support
 
@@ -227,6 +259,7 @@ You can test the action locally by running the Node.js scripts directly:
 export INPUT_ENABLED="true"
 export INPUT_LISTEN_HOST="127.0.0.1"
 export INPUT_LISTEN_PORT="8080"
+export INPUT_INSTALL_CERTIFICATE="true"
 export INPUT_PASSPHRASE="your-test-passphrase"
 export RUNNER_TEMP="/tmp"
 
@@ -252,6 +285,7 @@ On Windows PowerShell:
 $env:INPUT_ENABLED = "true"
 $env:INPUT_LISTEN_HOST = "127.0.0.1"
 $env:INPUT_LISTEN_PORT = "8080"
+$env:INPUT_INSTALL_CERTIFICATE = "true"
 $env:INPUT_PASSPHRASE = "your-test-passphrase"
 $env:RUNNER_TEMP = "$env:TEMP"
 

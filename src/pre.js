@@ -4,18 +4,94 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+async function installMitmproxyCertificate(trafficDir) {
+  try {
+    const certPath = path.join(trafficDir, 'mitmproxy-ca-cert.pem');
+    
+    // Wait a bit more for certificate to be generated
+    let attempts = 0;
+    while (!fs.existsSync(certPath) && attempts < 10) {
+      core.info(`Waiting for CA certificate to be generated... (attempt ${attempts + 1})`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
+    }
+    
+    if (!fs.existsSync(certPath)) {
+      core.warning('mitmproxy CA certificate not found, skipping installation');
+      return;
+    }
+    
+    core.info(`Found CA certificate at: ${certPath}`);
+    
+    // Install certificate based on platform
+    const platform = os.platform();
+    
+    if (platform === 'linux') {
+      // Ubuntu/Debian - copy to ca-certificates directory
+      try {
+        let targetDir;
+        if (fs.existsSync('/usr/local/share/ca-certificates/')) {
+          targetDir = '/usr/local/share/ca-certificates/';
+        } else if (fs.existsSync('/etc/ssl/certs/')) {
+          targetDir = '/etc/ssl/certs/';
+        } else {
+          core.warning('No suitable CA certificates directory found on Linux. Skipping certificate installation.');
+          return;
+        }
+        const targetPath = path.join(targetDir, 'mitmproxy-ca-cert.crt');
+        await exec.exec('sudo', ['cp', certPath, targetPath], { ignoreReturnCode: true });
+        // Only run update-ca-certificates if using the Debian/Ubuntu directory
+        if (targetDir === '/usr/local/share/ca-certificates/') {
+          await exec.exec('sudo', ['update-ca-certificates'], { ignoreReturnCode: true });
+        }
+        core.info('Successfully installed CA certificate on Linux');
+      } catch (error) {
+        core.warning(`Failed to install CA certificate on Linux: ${error.message}`);
+      }
+    } else if (platform === 'darwin') {
+      // macOS - add to keychain
+      try {
+        // Use the user's login keychain instead of the system keychain, and do not use sudo
+        await exec.exec('security', ['add-trusted-cert', '-d', '-r', 'trustRoot', '-k', `${os.homedir()}/Library/Keychains/login.keychain-db`, certPath], { ignoreReturnCode: true });
+        core.info('Successfully installed CA certificate on macOS (user keychain)');
+      } catch (error) {
+        core.warning(`Failed to install CA certificate on macOS: ${error.message}`);
+      }
+    } else if (platform === 'win32') {
+      // Windows - add to certificate store
+      try {
+        await exec.exec('certutil', ['-addstore', '-f', 'Root', certPath], { ignoreReturnCode: true });
+        core.info('Successfully installed CA certificate on Windows');
+      } catch (error) {
+        core.warning(`Failed to install CA certificate on Windows: ${error.message}`);
+      }
+    } else {
+      core.warning(`Certificate installation not supported on platform: ${platform}`);
+    }
+    
+    // Also set environment variable for applications that respect it
+    core.exportVariable('REQUESTS_CA_BUNDLE', certPath);
+    core.exportVariable('SSL_CERT_FILE', certPath);
+    core.info('Set CA certificate environment variables');
+    
+  } catch (error) {
+    core.warning(`Certificate installation failed: ${error.message}`);
+  }
+}
+
 async function run() {
   try {
     // This is the pre action - install and start mitmproxy
     const enabled = core.getInput('enabled') || 'true';
     const listenHost = core.getInput('listen-host') || '127.0.0.1';
     const listenPort = core.getInput('listen-port') || '8080';
-    const passphrase = core.getInput('passphrase');
+    const installCertificate = core.getInput('install-certificate') || 'true';
 
     // Check if mitmproxy is enabled
     if (enabled !== 'true') {
       core.info('mitmproxy is disabled, skipping...');
       core.saveState('mitmproxy-enabled', 'false');
+      core.saveState('mitmproxy-install-certificate', installCertificate);
       return;
     }
 
@@ -87,6 +163,12 @@ async function run() {
       throw new Error('Failed to start mitmdump');
     }
 
+    // Install CA certificate if requested
+    if (installCertificate === 'true') {
+      core.info('Installing mitmproxy CA certificate...');
+      await installMitmproxyCertificate(trafficDir);
+    }
+
     // Save outputs for JavaScript to read
     const proxyUrl = `http://${listenHost}:${listenPort}`;
 
@@ -100,6 +182,7 @@ async function run() {
     core.saveState('mitmproxy-enabled', enabled);
     core.saveState('mitmproxy-listen-host', listenHost);
     core.saveState('mitmproxy-listen-port', listenPort);
+    core.saveState('mitmproxy-install-certificate', installCertificate);
     core.saveState('mitmproxy-temp-dir', trafficDir);
     core.saveState('mitmproxy-traffic-file', trafficFile);
     core.saveState('mitmproxy-pid', mitmdumpProcess.pid.toString());

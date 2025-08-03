@@ -15,6 +15,10 @@ inputs:
     description: 'Proxy listen port'
     required: false
     default: '8080'
+  install-certificate:
+    description: 'Install mitmproxy CA certificate to system trust store (true/false)'
+    required: false
+    default: 'true'
   passphrase:
     description: 'Passphrase for artifact encryption'
     required: true
