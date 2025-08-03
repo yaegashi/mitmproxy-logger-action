@@ -49,8 +49,27 @@ async function run() {
       
       try {
         if (os.platform() === 'win32') {
-          // Windows process termination
-          await exec.exec('taskkill', ['/PID', pid, '/F'], { ignoreReturnCode: true });
+          // Windows: graceful shutdown with SIGINT, then force kill if needed
+          try {
+            process.kill(Number(pid), 'SIGINT');
+            core.info('Sent SIGINT to mitmdump process');
+          } catch (e) {
+            core.warning(`Failed to send SIGINT: ${e.message}`);
+          }
+          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+
+          // Check if process is still running
+          let stillRunning = false;
+          try {
+            process.kill(Number(pid), 0);
+            stillRunning = true;
+          } catch (e) {
+            stillRunning = false;
+          }
+          if (stillRunning) {
+            core.info('Process still running after SIGINT, using taskkill...');
+            await exec.exec('taskkill', ['/PID', pid, '/F'], { ignoreReturnCode: true });
+          }
         } else {
           // Unix process termination
           // Check if process is still running first
