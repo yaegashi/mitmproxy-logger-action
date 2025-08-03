@@ -1,5 +1,5 @@
 # Test artifacts
-mitmproxy-traffic/
+mitmproxy-stream/
 *.mitm
 *.har
 *.tar.gz
