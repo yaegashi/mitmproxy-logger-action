@@ -4,14 +4,30 @@
 
 ### 1. Empty `proxy-url` Output ✅
 
-**Problem**: `${{ steps.mitmproxy.outputs.proxy-url }}` was returning an empty string.
+**Problem**: `${{ steps.mitmproxy.outputs.proxy-url }}` was returning an empty string despite the pre action appearing to set outputs.
 
-**Root Cause**: The `start.sh` script was writing to `$GITHUB_OUTPUT`, but GitHub Actions composite actions require JavaScript wrappers to explicitly set outputs using `core.setOutput()`.
+**Root Cause**: When the JavaScript pre action called `exec.exec()` to run the bash script, the `$GITHUB_OUTPUT` environment variable was not being properly passed to the bash script. As a result:
+- The bash script wrote outputs to `$GITHUB_OUTPUT`, but this environment variable was undefined or pointing to the wrong location
+- The JavaScript code was also trying to set outputs, potentially creating conflicts
+- The outputs were not being properly set for subsequent workflow steps
 
-**Fix**: Updated `src/pre.js` to:
-- Read the shell script results
-- Explicitly set outputs using `core.setOutput('proxy-url', proxyUrl)`
-- Set both `proxy-url` and `traffic-file` outputs properly
+**Fix**: 
+1. **Proper Environment Variable Passing**: Modified `src/pre.js` to explicitly pass environment variables to the `exec.exec()` call:
+   ```javascript
+   await exec.exec('bash', [scriptPath], {
+     env: {
+       ...process.env,
+       INPUT_ENABLED: enabled,
+       INPUT_LISTEN_HOST: listenHost,
+       INPUT_LISTEN_PORT: listenPort,
+       INPUT_PASSPHRASE: passphrase
+     }
+   });
+   ```
+
+2. **Simplified Output Handling**: Instead of having both the bash script and JavaScript try to set outputs:
+   - **Bash script**: Creates files with output data (`proxy_url.txt`, `traffic_file_path.txt`)
+   - **JavaScript**: Reads these files and sets outputs via `core.setOutput()`
 
 ### 2. PID File Not Found in Post Action ✅
 
