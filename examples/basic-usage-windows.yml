@@ -34,11 +34,12 @@ jobs:
       - name: Run tests with proxy
         shell: powershell
         run: |
-          # With set-envvars: true (default), environment variables are automatically set
+          # With set-envvars: true (explicitly enabled), environment variables are automatically set
+          # Note: set-envvars defaults to false, so you need to explicitly set it to true
           # You can still override them if needed:
           # $env:http_proxy = "${{ steps.mitmproxy.outputs.proxy-url }}"
           # $env:https_proxy = "${{ steps.mitmproxy.outputs.proxy-url }}"
-          # $env:CURL_OPTIONS = "--ssl-no-revoke"
+          # Note: CURL_HOME and .curlrc are automatically configured for Windows
           
           # Example: test HTTP requests using PowerShell
           Invoke-WebRequest -Uri "http://httpbin.org/get" -UseBasicParsing
@@ -57,7 +58,7 @@ jobs:
           REM You can still set them manually if needed:
           REM set http_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
           REM set https_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
-          REM set CURL_OPTIONS=--ssl-no-revoke
+          REM Note: CURL_HOME and .curlrc are automatically configured for Windows
           curl http://httpbin.org/get
           curl https://httpbin.org/get
         continue-on-error: true

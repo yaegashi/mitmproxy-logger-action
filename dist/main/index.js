@@ -27571,6 +27571,31 @@ async function run() {
       // Read the proxy configuration from state (set by pre action)
       const listenHost = core.getState('mitmproxy-listen-host') || core.getInput('listen-host') || '127.0.0.1';
       const listenPort = core.getState('mitmproxy-listen-port') || core.getInput('listen-port') || '8080';
+      const setEnvvars = core.getState('mitmproxy-set-envvars') || core.getInput('set-envvars') || 'false';
+      
+      // Set environment variables if requested (moved from pre step to main step)
+      if (setEnvvars === 'true') {
+        const proxyUrl = `http://${listenHost}:${listenPort}`;
+        core.info('Setting proxy environment variables...');
+        core.exportVariable('http_proxy', proxyUrl);
+        core.exportVariable('https_proxy', proxyUrl);
+        
+        // For Windows, set CURL_HOME and create .curlrc with ssl-no-revoke
+        if (os.platform() === 'win32') {
+          const trafficDir = core.getState('mitmproxy-temp-dir');
+          if (trafficDir) {
+            core.exportVariable('CURL_HOME', trafficDir);
+            const curlrcPath = path.join(trafficDir, '.curlrc');
+            fs.writeFileSync(curlrcPath, 'ssl-no-revoke\n');
+            core.info(`Set environment variables: http_proxy=${proxyUrl}, https_proxy=${proxyUrl}, CURL_HOME=${trafficDir}`);
+            core.info(`Created .curlrc file at: ${curlrcPath}`);
+          } else {
+            core.info(`Set environment variables: http_proxy=${proxyUrl}, https_proxy=${proxyUrl}`);
+          }
+        } else {
+          core.info(`Set environment variables: http_proxy=${proxyUrl}, https_proxy=${proxyUrl}`);
+        }
+      }
       
       try {
         // Get the temporary directory from state
