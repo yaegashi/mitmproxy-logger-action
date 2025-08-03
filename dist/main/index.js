@@ -121,7 +121,7 @@ async function run() {
         // If not available in state, construct the expected path in RUNNER_TEMP
         if (!mitmproxyDir) {
           const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
-          mitmproxyDir = path.join(runnerTemp, 'mitmproxy-action-stream');
+          mitmproxyDir = path.join(runnerTemp, 'mitmproxy-logger-action');
           core.info(`Constructed mitmproxy directory: ${mitmproxyDir}`);
         } else {
           core.info(`Using mitmproxy directory from state: ${mitmproxyDir}`);

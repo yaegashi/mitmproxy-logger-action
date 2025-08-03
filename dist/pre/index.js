@@ -210,7 +210,7 @@ async function run() {
 
     // Create directory in RUNNER_TEMP to avoid workspace cleanup issues
     const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
-    const mitmproxyDir = path.join(runnerTemp, 'mitmproxy-action-stream');
+    const mitmproxyDir = path.join(runnerTemp, 'mitmproxy-logger-action');
 
     fs.mkdirSync(mitmproxyDir, { recursive: true });
 
