@@ -31,35 +31,50 @@ async function run() {
     // Save state for main action to set outputs (outputs from pre are not accessible in workflows)
     if (enabled === 'true') {
       // Save inputs as state so main can access them
-      core.saveState('enabled', enabled);
-      core.saveState('listen-host', listenHost);
-      core.saveState('listen-port', listenPort);
+      core.saveState('mitmproxy-enabled', enabled);
+      core.saveState('mitmproxy-listen-host', listenHost);
+      core.saveState('mitmproxy-listen-port', listenPort);
       
-      // Try to read the temporary directory path from the communication file
-      try {
-        const fs = require('fs');
-        const path = require('path');
-        const workspaceDir = process.env.GITHUB_WORKSPACE;
-        const workspaceTrafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
-        const tempDirFile = path.join(workspaceTrafficDir, 'temp_dir_path.txt');
+      // Read the temporary directory path directly from RUNNER_TEMP
+      const runnerTemp = process.env.RUNNER_TEMP;
+      if (runnerTemp) {
+        const tempDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+        core.saveState('mitmproxy-temp-dir', tempDir);
+        core.info(`Saved temporary traffic directory: ${tempDir}`);
         
-        // Give the script time to write the file
+        // Wait a moment for the script to finish writing files
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        if (fs.existsSync(tempDirFile)) {
-          const tempDir = fs.readFileSync(tempDirFile, 'utf8').trim();
-          core.saveState('temp-traffic-dir', tempDir);
-          core.info(`Saved temporary traffic directory: ${tempDir}`);
-        } else {
-          core.warning(`Temporary directory path file not found: ${tempDirFile}`);
+        // Read and save additional file paths from the temporary directory
+        try {
+          const trafficFilePath = path.join(tempDir, 'traffic_file_path.txt');
+          const pidFilePath = path.join(tempDir, 'mitmdump.pid');
+          const proxyUrlPath = path.join(tempDir, 'proxy_url.txt');
+          
+          if (fs.existsSync(trafficFilePath)) {
+            const trafficFile = fs.readFileSync(trafficFilePath, 'utf8').trim();
+            core.saveState('mitmproxy-traffic-file', trafficFile);
+          }
+          
+          if (fs.existsSync(pidFilePath)) {
+            const pid = fs.readFileSync(pidFilePath, 'utf8').trim();
+            core.saveState('mitmproxy-pid', pid);
+          }
+          
+          if (fs.existsSync(proxyUrlPath)) {
+            const proxyUrl = fs.readFileSync(proxyUrlPath, 'utf8').trim();
+            core.saveState('mitmproxy-proxy-url', proxyUrl);
+          }
+        } catch (error) {
+          core.warning(`Could not read some temporary files: ${error.message}`);
         }
-      } catch (error) {
-        core.warning(`Could not read temporary directory path: ${error.message}`);
+      } else {
+        core.warning('RUNNER_TEMP environment variable not available');
       }
       
       core.info('mitmproxy setup completed, main action will set outputs');
     } else {
-      core.saveState('enabled', 'false');
+      core.saveState('mitmproxy-enabled', 'false');
       core.info('mitmproxy is disabled');
     }
   } catch (error) {

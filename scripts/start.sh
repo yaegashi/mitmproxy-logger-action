@@ -56,11 +56,6 @@ PROXY_URL="http://${INPUT_LISTEN_HOST}:${INPUT_LISTEN_PORT}"
 # Save traffic file path for later use
 echo "$TRAFFIC_FILE" > "${TRAFFIC_DIR}/traffic_file_path.txt"
 
-# Save traffic directory path for JavaScript to read (using workspace for communication)
-WORKSPACE_TRAFFIC_DIR="${GITHUB_WORKSPACE}/mitmproxy-traffic"
-mkdir -p "$WORKSPACE_TRAFFIC_DIR"
-echo "$TRAFFIC_DIR" > "${WORKSPACE_TRAFFIC_DIR}/temp_dir_path.txt"
-
 # Save proxy URL for JavaScript to read
 echo "$PROXY_URL" > "${TRAFFIC_DIR}/proxy_url.txt"
 
