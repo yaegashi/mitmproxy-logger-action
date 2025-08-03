@@ -62,3 +62,9 @@ echo "$PROXY_URL" > "${TRAFFIC_DIR}/proxy_url.txt"
 echo "mitmproxy started successfully at $PROXY_URL"
 echo "PID: $MITMDUMP_PID"
 echo "Traffic file: $TRAFFIC_FILE"
+
+# Write outputs to GITHUB_OUTPUT if available (though pre outputs aren't accessible, main will read the files)
+if [ -n "$GITHUB_OUTPUT" ]; then
+    echo "proxy-url=$PROXY_URL" >> "$GITHUB_OUTPUT"
+    echo "traffic-file=$TRAFFIC_FILE" >> "$GITHUB_OUTPUT"
+fi
