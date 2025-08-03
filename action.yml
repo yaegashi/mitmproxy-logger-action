@@ -30,8 +30,8 @@ inputs:
 outputs:
   proxy-url:
     description: 'URL of the started proxy'
-  traffic-file:
-    description: 'Path to the traffic log file'
+  stream-file:
+    description: 'Path to the stream log file'
   cacert-path:
     description: 'Path to the CA certificate file'
 

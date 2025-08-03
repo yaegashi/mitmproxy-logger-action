@@ -124,7 +124,7 @@ The action automatically handles:
 | Output | Description |
 |--------|-------------|
 | `proxy-url` | URL of the started proxy (e.g., `http://127.0.0.1:8080`) |
-| `traffic-file` | Path to the stream log file |
+| `stream-file` | Path to the stream log file |
 | `cacert-path` | Path to the CA certificate file |
 
 ## Certificate Installation

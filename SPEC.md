@@ -56,7 +56,7 @@ Additionally sets environment variables for applications:
 ### 3. Stream Capture
 
 - **Format**: Native mitmproxy flow format (.mitm files)
-- **Location**: `RUNNER_TEMP/mitmproxy-action-traffic/`
+- **Location**: `RUNNER_TEMP/mitmproxy-action-stream/`
 - **Conversion**: Automatic HAR format generation for web compatibility
 - **Storage**: Timestamped files to avoid conflicts
 
@@ -85,7 +85,7 @@ Additionally sets environment variables for applications:
 | Output | Description |
 |--------|-------------|
 | `proxy-url` | Full proxy URL (e.g., `http://127.0.0.1:8080`) |
-| `traffic-file` | Path to captured stream file |
+| `stream-file` | Path to captured stream file |
 | `cacert-path` | Path to the CA certificate file |
 
 ## Implementation Details
@@ -93,7 +93,7 @@ Additionally sets environment variables for applications:
 ### Directory Structure
 
 ```
-RUNNER_TEMP/mitmproxy-action-traffic/
+RUNNER_TEMP/mitmproxy-action-stream/
 ├── stream_YYYYMMDDTHHMMSSZ.mitm         # Stream capture file
 ├── stream_YYYYMMDDTHHMMSSZ.har          # HAR format conversion
 ├── mitmdump.log                         # Proxy server logs
@@ -211,7 +211,7 @@ curl -x http://127.0.0.1:8080 http://httpbin.org/get
 openssl verify -CAfile /usr/local/share/ca-certificates/mitmproxy-ca-cert.crt
 
 # Verify stream capture
-ls -la $RUNNER_TEMP/mitmproxy-action-traffic/
+ls -la $RUNNER_TEMP/mitmproxy-action-stream/
 
 # Test password-protected ZIP extraction
 unzip -P your-passphrase mitmproxy_stream_*.zip

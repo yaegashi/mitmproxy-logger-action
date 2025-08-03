@@ -34,7 +34,7 @@ jobs:
         run: |
           echo "Testing outputs..."
           echo "proxy-url output: '${{ steps.mitmproxy.outputs.proxy-url }}'"
-          echo "traffic-file output: '${{ steps.mitmproxy.outputs.traffic-file }}'"
+          echo "stream-file output: '${{ steps.mitmproxy.outputs.stream-file }}'"
           echo "cacert-path output: '${{ steps.mitmproxy.outputs.cacert-path }}'"
           
           # Check if proxy-url is not empty
@@ -116,7 +116,7 @@ jobs:
         run: |
           echo "Testing outputs when set-envvars=false..."
           echo "proxy-url output: '${{ steps.mitmproxy-no-envvars.outputs.proxy-url }}'"
-          echo "traffic-file output: '${{ steps.mitmproxy-no-envvars.outputs.traffic-file }}'"
+          echo "stream-file output: '${{ steps.mitmproxy-no-envvars.outputs.stream-file }}'"
           echo "cacert-path output: '${{ steps.mitmproxy-no-envvars.outputs.cacert-path }}'"
           
           # Check if proxy-url is not empty

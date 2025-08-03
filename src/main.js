@@ -9,7 +9,7 @@ async function run() {
     const enabled = core.getState('mitmproxy-enabled') || core.getInput('enabled') || 'true';
     
     if (enabled === 'true') {
-      core.info('mitmproxy is running and capturing traffic...');
+      core.info('mitmproxy is running and capturing stream...');
       
       // Read the proxy configuration from state (set by pre action)
       const listenHost = core.getState('mitmproxy-listen-host') || core.getInput('listen-host') || '127.0.0.1';
@@ -47,7 +47,7 @@ async function run() {
         // If not available in state, construct the expected path in RUNNER_TEMP
         if (!mitmproxyDir) {
           const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
-          mitmproxyDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+          mitmproxyDir = path.join(runnerTemp, 'mitmproxy-action-stream');
           core.info(`Constructed mitmproxy directory: ${mitmproxyDir}`);
         } else {
           core.info(`Using mitmproxy directory from state: ${mitmproxyDir}`);
@@ -74,10 +74,10 @@ async function run() {
         }
         
         if (streamFile) {
-          core.setOutput('traffic-file', streamFile);
-          core.info(`Set traffic file output: ${streamFile}`);
+          core.setOutput('stream-file', streamFile);
+          core.info(`Set stream file output: ${streamFile}`);
         } else {
-          core.setOutput('traffic-file', '');
+          core.setOutput('stream-file', '');
           core.warning('No stream file found');
         }
         
@@ -90,23 +90,23 @@ async function run() {
           core.info('No CA certificate path available');
         }
         
-        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${streamFile || ''}, cacert-path=${cacertPath}`);
+        core.info(`Set outputs: proxy-url=${proxyUrl}, stream-file=${streamFile || ''}, cacert-path=${cacertPath}`);
       } catch (error) {
         core.warning(`Could not set outputs from state: ${error.message}`);
-        // Set basic outputs even if we can't read the traffic file
+        // Set basic outputs even if we can't read the stream file
         const proxyUrl = `http://${listenHost}:${listenPort}`;
         core.setOutput('proxy-url', proxyUrl);
-        core.setOutput('traffic-file', '');
+        core.setOutput('stream-file', '');
         core.setOutput('cacert-path', '');
-        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=, cacert-path=`);
+        core.info(`Set outputs: proxy-url=${proxyUrl}, stream-file=, cacert-path=`);
       }
       
-      core.info('Traffic will be automatically uploaded when the action completes.');
+      core.info('Stream will be automatically uploaded when the action completes.');
     } else {
       core.info('mitmproxy is disabled.');
       // Set empty outputs when disabled
       core.setOutput('proxy-url', '');
-      core.setOutput('traffic-file', '');
+      core.setOutput('stream-file', '');
       core.setOutput('cacert-path', '');
     }
   } catch (error) {
