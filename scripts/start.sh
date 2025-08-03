@@ -16,8 +16,8 @@ if ! command -v mitmdump &> /dev/null; then
     pip install mitmproxy
 fi
 
-# Create traffic directory
-TRAFFIC_DIR="${GITHUB_WORKSPACE}/mitmproxy-traffic"
+# Create traffic directory in RUNNER_TEMP to avoid workspace cleanup issues
+TRAFFIC_DIR="${RUNNER_TEMP}/mitmproxy-action-traffic"
 mkdir -p "$TRAFFIC_DIR"
 
 # Generate traffic file name with timestamp
@@ -55,6 +55,11 @@ PROXY_URL="http://${INPUT_LISTEN_HOST}:${INPUT_LISTEN_PORT}"
 
 # Save traffic file path for later use
 echo "$TRAFFIC_FILE" > "${TRAFFIC_DIR}/traffic_file_path.txt"
+
+# Save traffic directory path for JavaScript to read (using workspace for communication)
+WORKSPACE_TRAFFIC_DIR="${GITHUB_WORKSPACE}/mitmproxy-traffic"
+mkdir -p "$WORKSPACE_TRAFFIC_DIR"
+echo "$TRAFFIC_DIR" > "${WORKSPACE_TRAFFIC_DIR}/temp_dir_path.txt"
 
 # Save proxy URL for JavaScript to read
 echo "$PROXY_URL" > "${TRAFFIC_DIR}/proxy_url.txt"

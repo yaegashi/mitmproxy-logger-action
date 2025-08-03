@@ -27591,6 +27591,29 @@ async function run() {
       core.saveState('enabled', enabled);
       core.saveState('listen-host', listenHost);
       core.saveState('listen-port', listenPort);
+      
+      // Try to read the temporary directory path from the communication file
+      try {
+        const fs = __nccwpck_require__(9896);
+        const path = __nccwpck_require__(6928);
+        const workspaceDir = process.env.GITHUB_WORKSPACE;
+        const workspaceTrafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
+        const tempDirFile = path.join(workspaceTrafficDir, 'temp_dir_path.txt');
+        
+        // Give the script time to write the file
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        if (fs.existsSync(tempDirFile)) {
+          const tempDir = fs.readFileSync(tempDirFile, 'utf8').trim();
+          core.saveState('temp-traffic-dir', tempDir);
+          core.info(`Saved temporary traffic directory: ${tempDir}`);
+        } else {
+          core.warning(`Temporary directory path file not found: ${tempDirFile}`);
+        }
+      } catch (error) {
+        core.warning(`Could not read temporary directory path: ${error.message}`);
+      }
+      
       core.info('mitmproxy setup completed, main action will set outputs');
     } else {
       core.saveState('enabled', 'false');

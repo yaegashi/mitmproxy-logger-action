@@ -24,7 +24,37 @@ async function run() {
     // Get traffic file and PID from state if available
     const trafficFile = core.getState('traffic-file');
     const savedPid = core.getState('mitmdump-pid');
-    const trafficDir = core.getState('traffic-dir') || path.join(process.env.GITHUB_WORKSPACE, 'mitmproxy-traffic');
+    let trafficDir = core.getState('traffic-dir');
+    
+    // If traffic-dir not in state, try to get temp directory
+    if (!trafficDir) {
+      trafficDir = core.getState('temp-traffic-dir');
+    }
+    
+    // Fallback to workspace if nothing found
+    if (!trafficDir) {
+      const workspaceDir = process.env.GITHUB_WORKSPACE;
+      const workspaceTrafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
+      const tempDirFile = path.join(workspaceTrafficDir, 'temp_dir_path.txt');
+      
+      if (fs.existsSync(tempDirFile)) {
+        trafficDir = fs.readFileSync(tempDirFile, 'utf8').trim();
+        core.info(`Found temporary traffic directory: ${trafficDir}`);
+      } else {
+        // Try to construct the expected path in RUNNER_TEMP
+        const runnerTemp = process.env.RUNNER_TEMP;
+        if (runnerTemp) {
+          trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+          core.info(`Constructed temporary traffic directory: ${trafficDir}`);
+        } else {
+          // Final fallback to old behavior
+          trafficDir = workspaceTrafficDir;
+          core.warning(`Could not find temporary directory path, falling back to: ${trafficDir}`);
+        }
+      }
+    } else {
+      core.info(`Using traffic directory from state: ${trafficDir}`);
+    }
     
     if (trafficFile) {
       process.env.TRAFFIC_FILE = trafficFile;

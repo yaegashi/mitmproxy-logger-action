@@ -15,8 +15,34 @@ async function run() {
       const listenPort = core.getState('listen-port') || core.getInput('listen-port') || '8080';
       
       try {
-        const workspaceDir = process.env.GITHUB_WORKSPACE;
-        const trafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
+        // First try to get the temporary directory from state
+        let trafficDir = core.getState('temp-traffic-dir');
+        
+        // If not available in state, try to read from workspace communication file, 
+        // or construct the expected path
+        if (!trafficDir) {
+          const workspaceDir = process.env.GITHUB_WORKSPACE;
+          const workspaceTrafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
+          const tempDirFile = path.join(workspaceTrafficDir, 'temp_dir_path.txt');
+          
+          if (fs.existsSync(tempDirFile)) {
+            trafficDir = fs.readFileSync(tempDirFile, 'utf8').trim();
+            core.info(`Found temporary traffic directory: ${trafficDir}`);
+          } else {
+            // Try to construct the expected path in RUNNER_TEMP
+            const runnerTemp = process.env.RUNNER_TEMP;
+            if (runnerTemp) {
+              trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+              core.info(`Constructed temporary traffic directory: ${trafficDir}`);
+            } else {
+              // Final fallback to old behavior
+              trafficDir = workspaceTrafficDir;
+              core.warning(`Could not find temporary directory path, falling back to: ${trafficDir}`);
+            }
+          }
+        } else {
+          core.info(`Using temporary traffic directory from state: ${trafficDir}`);
+        }
         
         // Wait a moment for the script to finish writing files (if it hasn't already)
         await new Promise(resolve => setTimeout(resolve, 1000));
