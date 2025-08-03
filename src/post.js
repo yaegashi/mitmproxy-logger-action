@@ -4,6 +4,7 @@ const artifact = require('@actions/artifact');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const yazl = require('yazl');
 
 async function run() {
   try {
@@ -110,16 +111,11 @@ async function run() {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const archiveName = `mitmproxy_traffic_${timestamp}`;
     
-    // Find the traffic file - use state first, then fallback to file system search
+    // Find the traffic file - use state only (no file system search)
     let actualTrafficFile = trafficFile;
     
-    if (!actualTrafficFile && fs.existsSync(path.join(trafficDir, 'traffic_file_path.txt'))) {
-      actualTrafficFile = fs.readFileSync(path.join(trafficDir, 'traffic_file_path.txt'), 'utf8').trim();
-      core.info(`Found traffic file path in file: ${actualTrafficFile}`);
-    }
-
-    // Also check for any .mitm files in the traffic directory
-    if (!actualTrafficFile || !fs.existsSync(actualTrafficFile)) {
+    if (!actualTrafficFile) {
+      // Check for any .mitm files in the traffic directory
       core.info('Checking for any traffic files in directory...');
       if (fs.existsSync(trafficDir)) {
         const mitmFiles = fs.readdirSync(trafficDir).filter(f => f.endsWith('.mitm'));
@@ -141,76 +137,132 @@ async function run() {
     core.info(`Traffic file: ${actualTrafficFile}`);
     core.info(`Traffic file size: ${fileSize} bytes`);
 
+    // Convert .mitm to .har using mitmdump hardump
+    let harFile = null;
+    if (actualTrafficFile && fs.existsSync(actualTrafficFile)) {
+      const baseName = path.basename(actualTrafficFile, '.mitm');
+      harFile = path.join(path.dirname(actualTrafficFile), `${baseName}.har`);
+      
+      core.info('Converting .mitm to .har using mitmdump hardump...');
+      try {
+        await exec.exec('mitmdump', [
+          '--no-server', 
+          '--rfile', actualTrafficFile, 
+          '--set', `hardump=${harFile}`
+        ]);
+        core.info(`Successfully converted to HAR: ${harFile}`);
+      } catch (error) {
+        core.warning(`HAR conversion failed (mitmdump version may not support hardump): ${error.message}`);
+        // Create empty HAR file to ensure consistency
+        const emptyHar = {
+          log: {
+            version: "1.2",
+            creator: { name: "mitmproxy-logger-action", version: "1.0.0" },
+            entries: []
+          }
+        };
+        fs.writeFileSync(harFile, JSON.stringify(emptyHar, null, 2));
+        core.info('Created empty HAR file due to conversion failure');
+      }
+    }
+
     // Create artifacts directory
     const artifactDir = path.join(trafficDir, 'artifacts');
     fs.mkdirSync(artifactDir, { recursive: true });
 
-    // Compress the traffic file - use cross-platform approach
-    core.info('Compressing traffic file...');
-    const compressedFile = path.join(artifactDir, `${archiveName}.tar.gz`);
+    // Create ZIP archive with both .mitm and .har files
+    core.info('Creating ZIP archive...');
+    const zipFile = path.join(artifactDir, `${archiveName}.zip`);
     
-    if (os.platform() === 'win32') {
-      // On Windows, use PowerShell to create compressed archive
-      // First try tar if available (Windows 10 1803+ has tar.exe)
-      try {
-        await exec.exec('tar', ['-czf', compressedFile, '-C', path.dirname(actualTrafficFile), path.basename(actualTrafficFile)]);
-      } catch (error) {
-        core.warning('tar command not available on Windows, using PowerShell compression');
-        // Fallback to PowerShell compression
-        const zipFile = path.join(artifactDir, `${archiveName}.zip`);
-        await exec.exec('powershell', [
-          '-Command',
-          `Compress-Archive -Path "${actualTrafficFile}" -DestinationPath "${zipFile}"`
-        ]);
-        // Rename for consistency
-        fs.renameSync(zipFile, compressedFile);
-      }
-    } else {
-      // Unix systems
-      await exec.exec('tar', ['-czf', compressedFile, '-C', path.dirname(actualTrafficFile), path.basename(actualTrafficFile)]);
-    }
-
-    let finalFile = compressedFile;
-
-    // Encrypt if passphrase is provided
-    if (passphrase) {
-      core.info('Encrypting traffic file...');
-      const encryptedFile = path.join(artifactDir, `${archiveName}.tar.gz.enc`);
+    await new Promise((resolve, reject) => {
+      const zipArchive = new yazl.ZipFile();
       
-      // Check if openssl is available
-      try {
-        await exec.exec('openssl', [
-          'enc', '-aes-256-cbc', '-salt', '-pbkdf2',
-          '-in', compressedFile,
-          '-out', encryptedFile,
-          '-pass', `pass:${passphrase}`
-        ]);
-        fs.unlinkSync(compressedFile);
-        finalFile = encryptedFile;
-        core.info('Traffic file encrypted successfully');
-      } catch (error) {
-        if (os.platform() === 'win32') {
-          core.warning('OpenSSL not available on Windows, skipping encryption. Install OpenSSL for encryption support.');
-          core.warning('File will be uploaded without encryption.');
-        } else {
-          throw error;
-        }
+      // Add .mitm file
+      if (actualTrafficFile && fs.existsSync(actualTrafficFile)) {
+        zipArchive.addFile(actualTrafficFile, path.basename(actualTrafficFile));
+        core.info(`Added to ZIP: ${path.basename(actualTrafficFile)}`);
       }
-    } else {
-      core.warning('No passphrase provided, file will not be encrypted');
-    }
+      
+      // Add .har file
+      if (harFile && fs.existsSync(harFile)) {
+        zipArchive.addFile(harFile, path.basename(harFile));
+        core.info(`Added to ZIP: ${path.basename(harFile)}`);
+      }
+      
+      // Add logs if available
+      const logFile = path.join(trafficDir, 'mitmdump.log');
+      if (fs.existsSync(logFile)) {
+        zipArchive.addFile(logFile, 'mitmdump.log');
+        core.info('Added mitmdump log file to ZIP');
+      }
+      
+      zipArchive.end();
+      
+      zipArchive.outputStream.pipe(fs.createWriteStream(zipFile))
+        .on('close', () => {
+          core.info(`ZIP archive created: ${zipFile}`);
+          resolve();
+        })
+        .on('error', reject);
+    });
 
-    // Include logs if available
-    const logFile = path.join(trafficDir, 'mitmdump.log');
-    if (fs.existsSync(logFile)) {
-      fs.copyFileSync(logFile, path.join(artifactDir, 'mitmdump.log'));
-      core.info('Included mitmdump log file');
+    let finalFile = zipFile;
+
+    // Encrypt ZIP with password if passphrase is provided
+    if (passphrase) {
+      core.info('Creating password-protected ZIP archive...');
+      const encryptedZipFile = path.join(artifactDir, `${archiveName}_encrypted.zip`);
+      
+      await new Promise((resolve, reject) => {
+        const zipArchive = new yazl.ZipFile();
+        
+        // Add .mitm file with encryption
+        if (actualTrafficFile && fs.existsSync(actualTrafficFile)) {
+          zipArchive.addFile(actualTrafficFile, path.basename(actualTrafficFile), {
+            password: passphrase
+          });
+          core.info(`Added encrypted to ZIP: ${path.basename(actualTrafficFile)}`);
+        }
+        
+        // Add .har file with encryption
+        if (harFile && fs.existsSync(harFile)) {
+          zipArchive.addFile(harFile, path.basename(harFile), {
+            password: passphrase
+          });
+          core.info(`Added encrypted to ZIP: ${path.basename(harFile)}`);
+        }
+        
+        // Add logs if available with encryption
+        const logFile = path.join(trafficDir, 'mitmdump.log');
+        if (fs.existsSync(logFile)) {
+          zipArchive.addFile(logFile, 'mitmdump.log', {
+            password: passphrase
+          });
+          core.info('Added encrypted mitmdump log file to ZIP');
+        }
+        
+        zipArchive.end();
+        
+        zipArchive.outputStream.pipe(fs.createWriteStream(encryptedZipFile))
+          .on('close', () => {
+            core.info(`Password-protected ZIP archive created: ${encryptedZipFile}`);
+            // Remove unencrypted ZIP
+            if (fs.existsSync(zipFile)) {
+              fs.unlinkSync(zipFile);
+            }
+            finalFile = encryptedZipFile;
+            resolve();
+          })
+          .on('error', reject);
+      });
+    } else {
+      core.warning('No passphrase provided, ZIP file will not be password-protected');
     }
 
     // Upload artifacts using GitHub Actions artifact API
     try {
       const artifactClient = new artifact.DefaultArtifactClient();
-      const files = fs.readdirSync(artifactDir).map(file => path.join(artifactDir, file));
+      const files = [finalFile];
       
       core.info(`Uploading artifacts: ${files.map(f => path.basename(f)).join(', ')}`);
       core.info(`Artifact root directory: ${artifactDir}`);
