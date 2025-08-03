@@ -27568,19 +27568,22 @@ async function run() {
     const listenPort = core.getInput('listen-port') || '8080';
     const passphrase = core.getInput('passphrase');
 
-    // Set environment variables for the script
-    process.env.INPUT_ENABLED = enabled;
-    process.env.INPUT_LISTEN_HOST = listenHost;
-    process.env.INPUT_LISTEN_PORT = listenPort;
-    process.env.INPUT_PASSPHRASE = passphrase;
-
     // Get the action path and run the start script
     // When running in GitHub Actions, GITHUB_ACTION_PATH points to the action root
     // When building/testing locally, we need to go up from dist/pre to the repository root
     const actionPath = process.env.GITHUB_ACTION_PATH || path.resolve(__dirname, '..', '..');
     const scriptPath = path.join(actionPath, 'scripts', 'start.sh');
     
-    await exec.exec('bash', [scriptPath]);
+    // Pass environment variables to the script, especially GITHUB_OUTPUT
+    await exec.exec('bash', [scriptPath], {
+      env: {
+        ...process.env,
+        INPUT_ENABLED: enabled,
+        INPUT_LISTEN_HOST: listenHost,
+        INPUT_LISTEN_PORT: listenPort,
+        INPUT_PASSPHRASE: passphrase
+      }
+    });
     
     // The bash script sets outputs via $GITHUB_OUTPUT
     // We also set them via core.setOutput() as a fallback to ensure they're available
@@ -27592,8 +27595,16 @@ async function run() {
         // Wait a moment for the script to finish writing files
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Set the proxy URL output 
-        const proxyUrl = `http://${listenHost}:${listenPort}`;
+        // Set the proxy URL output by reading from the file created by the script
+        const proxyUrlPath = path.join(trafficDir, 'proxy_url.txt');
+        let proxyUrl = '';
+        
+        if (fs.existsSync(proxyUrlPath)) {
+          proxyUrl = fs.readFileSync(proxyUrlPath, 'utf8').trim();
+        } else {
+          // Fallback to constructing the URL if file doesn't exist
+          proxyUrl = `http://${listenHost}:${listenPort}`;
+        }
         core.setOutput('proxy-url', proxyUrl);
         
         // Read traffic file path and save as state for post action
