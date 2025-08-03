@@ -27612,6 +27612,8 @@ async function run() {
       '--set', `confdir=${trafficDir}`
     ];
 
+    const logFd = fs.openSync(logFile, 'a');
+
     // On Windows, we need to handle process spawning differently
     let mitmdumpProcess;
     if (os.platform() === 'win32') {
@@ -27619,13 +27621,8 @@ async function run() {
       const { spawn } = __nccwpck_require__(5317);
       mitmdumpProcess = spawn('mitmdump', mitmdumpArgs, {
         detached: false,
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', logFd, logFd]
       });
-
-      // Write logs to file
-      const logStream = fs.createWriteStream(logFile);
-      mitmdumpProcess.stdout.pipe(logStream);
-      mitmdumpProcess.stderr.pipe(logStream);
 
       // Save the PID for cleanup
       fs.writeFileSync(pidFile, mitmdumpProcess.pid.toString());
@@ -27634,13 +27631,8 @@ async function run() {
       const { spawn } = __nccwpck_require__(5317);
       mitmdumpProcess = spawn('mitmdump', mitmdumpArgs, {
         detached: true,
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', logFd, logFd]
       });
-
-      // Write logs to file
-      const logStream = fs.createWriteStream(logFile);
-      mitmdumpProcess.stdout.pipe(logStream);
-      mitmdumpProcess.stderr.pipe(logStream);
 
       // Save the PID for cleanup
       fs.writeFileSync(pidFile, mitmdumpProcess.pid.toString());
@@ -27648,6 +27640,8 @@ async function run() {
       // Unref the process so it doesn't keep the Node.js process alive
       mitmdumpProcess.unref();
     }
+
+    fs.closeSync(logFd);
 
     // Wait a moment for the proxy to start
     await new Promise(resolve => setTimeout(resolve, 2000));
