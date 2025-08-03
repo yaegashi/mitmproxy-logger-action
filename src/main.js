@@ -5,77 +5,63 @@ const fs = require('fs');
 async function run() {
   try {
     // Main action - read state from pre action and set outputs
-    const enabled = core.getState('enabled') || core.getInput('enabled') || 'true';
+    const enabled = core.getState('mitmproxy-enabled') || core.getInput('enabled') || 'true';
     
     if (enabled === 'true') {
       core.info('mitmproxy is running and capturing traffic...');
       
       // Read the proxy configuration from state (set by pre action)
-      const listenHost = core.getState('listen-host') || core.getInput('listen-host') || '127.0.0.1';
-      const listenPort = core.getState('listen-port') || core.getInput('listen-port') || '8080';
+      const listenHost = core.getState('mitmproxy-listen-host') || core.getInput('listen-host') || '127.0.0.1';
+      const listenPort = core.getState('mitmproxy-listen-port') || core.getInput('listen-port') || '8080';
       
       try {
-        const workspaceDir = process.env.GITHUB_WORKSPACE;
-        const trafficDir = path.join(workspaceDir, 'mitmproxy-traffic');
+        // Get the temporary directory from state
+        let trafficDir = core.getState('mitmproxy-temp-dir');
         
-        // Wait a moment for the script to finish writing files (if it hasn't already)
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Set the proxy URL output by reading from the file created by the script
-        const proxyUrlPath = path.join(trafficDir, 'proxy_url.txt');
-        let proxyUrl = '';
-        
-        if (fs.existsSync(proxyUrlPath)) {
-          proxyUrl = fs.readFileSync(proxyUrlPath, 'utf8').trim();
+        // If not available in state, construct the expected path in RUNNER_TEMP
+        if (!trafficDir) {
+          const runnerTemp = process.env.RUNNER_TEMP;
+          if (runnerTemp) {
+            trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+            core.info(`Constructed temporary traffic directory: ${trafficDir}`);
+          } else {
+            throw new Error('RUNNER_TEMP environment variable is not available and no temporary directory found in state');
+          }
         } else {
-          // Fallback to constructing the URL if file doesn't exist
+          core.info(`Using temporary traffic directory from state: ${trafficDir}`);
+        }
+        
+        // Get proxy URL from state or construct it
+        let proxyUrl = core.getState('mitmproxy-proxy-url');
+        if (!proxyUrl) {
           proxyUrl = `http://${listenHost}:${listenPort}`;
         }
         core.setOutput('proxy-url', proxyUrl);
         
-        // Read PID and save as state for post action
-        const pidFilePath = path.join(trafficDir, 'mitmdump.pid');
-        let mitmproxyPid = '';
-        if (fs.existsSync(pidFilePath)) {
-          mitmproxyPid = fs.readFileSync(pidFilePath, 'utf8').trim();
-          core.saveState('mitmdump-pid', mitmproxyPid);
-          core.info(`Saved mitmdump PID: ${mitmproxyPid}`);
-        } else {
-          core.warning(`PID file not found at: ${pidFilePath}`);
-        }
-        
-        // Read traffic file path and save as state for post action
-        const trafficFilePath = path.join(trafficDir, 'traffic_file_path.txt');
-        let trafficFile = '';
-        if (fs.existsSync(trafficFilePath)) {
-          trafficFile = fs.readFileSync(trafficFilePath, 'utf8').trim();
-          core.saveState('traffic-file', trafficFile);
-          core.setOutput('traffic-file', trafficFile);
-          core.info(`Saved traffic file path: ${trafficFile}`);
-        } else {
-          core.warning(`Traffic file path not found at: ${trafficFilePath}`);
-          // Try to find any .mitm files in the traffic directory as fallback
+        // Get traffic file from state
+        let trafficFile = core.getState('mitmproxy-traffic-file');
+        if (!trafficFile) {
+          // Fallback: look for any .mitm files in the traffic directory
           if (fs.existsSync(trafficDir)) {
             const mitmFiles = fs.readdirSync(trafficDir).filter(f => f.endsWith('.mitm'));
             if (mitmFiles.length > 0) {
               trafficFile = path.join(trafficDir, mitmFiles[0]);
-              core.saveState('traffic-file', trafficFile);
-              core.setOutput('traffic-file', trafficFile);
-              core.info(`Found and saved traffic file: ${trafficFile}`);
-            } else {
-              core.setOutput('traffic-file', '');
+              core.info(`Found traffic file: ${trafficFile}`);
             }
-          } else {
-            core.setOutput('traffic-file', '');
           }
         }
         
-        // Save traffic directory path as well for post action
-        core.saveState('traffic-dir', trafficDir);
+        if (trafficFile) {
+          core.setOutput('traffic-file', trafficFile);
+          core.info(`Set traffic file output: ${trafficFile}`);
+        } else {
+          core.setOutput('traffic-file', '');
+          core.warning('No traffic file found');
+        }
         
-        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${trafficFile}`);
+        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${trafficFile || ''}`);
       } catch (error) {
-        core.warning(`Could not set outputs from traffic files: ${error.message}`);
+        core.warning(`Could not set outputs from state: ${error.message}`);
         // Set basic outputs even if we can't read the traffic file
         const proxyUrl = `http://${listenHost}:${listenPort}`;
         core.setOutput('proxy-url', proxyUrl);

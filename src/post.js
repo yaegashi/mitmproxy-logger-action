@@ -21,10 +21,24 @@ async function run() {
     process.env.INPUT_ENABLED = enabled;
     process.env.INPUT_PASSPHRASE = passphrase;
     
-    // Get traffic file and PID from state if available
-    const trafficFile = core.getState('traffic-file');
-    const savedPid = core.getState('mitmdump-pid');
-    const trafficDir = core.getState('traffic-dir') || path.join(process.env.GITHUB_WORKSPACE, 'mitmproxy-traffic');
+    // Get traffic file and PID from state
+    const trafficFile = core.getState('mitmproxy-traffic-file');
+    const savedPid = core.getState('mitmproxy-pid');
+    let trafficDir = core.getState('mitmproxy-temp-dir');
+    
+    // If not available in state, construct the expected path in RUNNER_TEMP
+    if (!trafficDir) {
+      const runnerTemp = process.env.RUNNER_TEMP;
+      if (runnerTemp) {
+        trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+        core.info(`Constructed temporary traffic directory: ${trafficDir}`);
+      } else {
+        core.warning('Could not determine temporary directory path');
+        return;
+      }
+    } else {
+      core.info(`Using traffic directory from state: ${trafficDir}`);
+    }
     
     if (trafficFile) {
       process.env.TRAFFIC_FILE = trafficFile;

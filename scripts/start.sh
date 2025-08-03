@@ -16,8 +16,8 @@ if ! command -v mitmdump &> /dev/null; then
     pip install mitmproxy
 fi
 
-# Create traffic directory
-TRAFFIC_DIR="${GITHUB_WORKSPACE}/mitmproxy-traffic"
+# Create traffic directory in RUNNER_TEMP to avoid workspace cleanup issues
+TRAFFIC_DIR="${RUNNER_TEMP}/mitmproxy-action-traffic"
 mkdir -p "$TRAFFIC_DIR"
 
 # Generate traffic file name with timestamp

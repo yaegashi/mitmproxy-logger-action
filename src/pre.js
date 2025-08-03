@@ -31,12 +31,50 @@ async function run() {
     // Save state for main action to set outputs (outputs from pre are not accessible in workflows)
     if (enabled === 'true') {
       // Save inputs as state so main can access them
-      core.saveState('enabled', enabled);
-      core.saveState('listen-host', listenHost);
-      core.saveState('listen-port', listenPort);
+      core.saveState('mitmproxy-enabled', enabled);
+      core.saveState('mitmproxy-listen-host', listenHost);
+      core.saveState('mitmproxy-listen-port', listenPort);
+      
+      // Read the temporary directory path directly from RUNNER_TEMP
+      const runnerTemp = process.env.RUNNER_TEMP;
+      if (runnerTemp) {
+        const tempDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+        core.saveState('mitmproxy-temp-dir', tempDir);
+        core.info(`Saved temporary traffic directory: ${tempDir}`);
+        
+        // Wait a moment for the script to finish writing files
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Read and save additional file paths from the temporary directory
+        try {
+          const trafficFilePath = path.join(tempDir, 'traffic_file_path.txt');
+          const pidFilePath = path.join(tempDir, 'mitmdump.pid');
+          const proxyUrlPath = path.join(tempDir, 'proxy_url.txt');
+          
+          if (fs.existsSync(trafficFilePath)) {
+            const trafficFile = fs.readFileSync(trafficFilePath, 'utf8').trim();
+            core.saveState('mitmproxy-traffic-file', trafficFile);
+          }
+          
+          if (fs.existsSync(pidFilePath)) {
+            const pid = fs.readFileSync(pidFilePath, 'utf8').trim();
+            core.saveState('mitmproxy-pid', pid);
+          }
+          
+          if (fs.existsSync(proxyUrlPath)) {
+            const proxyUrl = fs.readFileSync(proxyUrlPath, 'utf8').trim();
+            core.saveState('mitmproxy-proxy-url', proxyUrl);
+          }
+        } catch (error) {
+          core.warning(`Could not read some temporary files: ${error.message}`);
+        }
+      } else {
+        core.warning('RUNNER_TEMP environment variable not available');
+      }
+      
       core.info('mitmproxy setup completed, main action will set outputs');
     } else {
-      core.saveState('enabled', 'false');
+      core.saveState('mitmproxy-enabled', 'false');
       core.info('mitmproxy is disabled');
     }
   } catch (error) {
