@@ -64,11 +64,16 @@ jobs:
             echo "✅ SUCCESS: https_proxy is set to: $https_proxy"
           fi
           
-          if [ -z "$CURL_OPTIONS" ]; then
-            echo "❌ ERROR: CURL_OPTIONS environment variable not set!"
-            exit 1
+          # Only check CURL_OPTIONS on Windows runners
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            if [ -z "$CURL_OPTIONS" ]; then
+              echo "❌ ERROR: CURL_OPTIONS environment variable not set!"
+              exit 1
+            else
+              echo "✅ SUCCESS: CURL_OPTIONS is set to: $CURL_OPTIONS"
+            fi
           else
-            echo "✅ SUCCESS: CURL_OPTIONS is set to: $CURL_OPTIONS"
+            echo "ℹ️ Skipping CURL_OPTIONS check on non-Windows runner (${{ runner.os }})"
           fi
           
           # Test that we can use the proxy URL

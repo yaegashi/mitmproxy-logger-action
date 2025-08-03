@@ -23,7 +23,7 @@ async function installMitmproxyCertificate(trafficDir) {
 
     if (!certificateFound) {
       core.warning('mitmproxy CA certificate not found, skipping installation');
-      return null;
+      return '';
     }
 
     core.info(`Found CA certificate at: ${certPath}`);
@@ -85,7 +85,7 @@ async function installMitmproxyCertificate(trafficDir) {
     return certPath;
   } catch (error) {
     core.warning(`Certificate installation failed: ${error.message}`);
-    return null;
+    return '';
   }
 }
 
@@ -225,7 +225,7 @@ async function run() {
     core.saveState('mitmproxy-traffic-file', trafficFile);
     core.saveState('mitmproxy-pid', mitmdumpProcess.pid.toString());
     core.saveState('mitmproxy-proxy-url', proxyUrl);
-    core.saveState('mitmproxy-cacert-path', certPath || '');
+    core.saveState('mitmproxy-cacert-path', certPath);
 
     core.info('mitmproxy setup completed, main action will set outputs');
   } catch (error) {
