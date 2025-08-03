@@ -77,7 +77,7 @@ Additionally sets environment variables for applications:
 | `listen-host` | string | `127.0.0.1` | Proxy server bind address |
 | `listen-port` | string | `8080` | Proxy server port |
 | `install-cacert` | boolean | `true` | Install CA certificate to system trust store |
-| `set-envvars` | boolean | `true` | Set proxy environment variables automatically |
+| `set-envvars` | boolean | `false` | Set proxy environment variables automatically |
 | `passphrase` | string | required | Encryption passphrase for artifacts |
 
 ### Outputs

@@ -22,7 +22,7 @@ inputs:
   set-envvars:
     description: 'Set proxy environment variables automatically (true/false)'
     required: false
-    default: 'true'
+    default: 'false'
   passphrase:
     description: 'Passphrase for artifact encryption'
     required: true

@@ -8,6 +8,16 @@ const yazl = require('yazl');
 
 async function run() {
   try {
+    // Unset proxy environment variables first to avoid affecting artifact upload
+    const setEnvvars = core.getInput('set-envvars') || 'false';
+    if (setEnvvars === 'true') {
+      core.info('Unsetting proxy environment variables to avoid affecting artifact upload...');
+      core.exportVariable('http_proxy', '');
+      core.exportVariable('https_proxy', '');
+      core.exportVariable('CURL_HOME', '');
+      core.info('Unset environment variables: http_proxy, https_proxy, CURL_HOME');
+    }
+    
     // This is the post action - stop mitmproxy and upload artifacts
     const enabled = core.getInput('enabled') || 'true';
     const passphrase = core.getInput('passphrase');
