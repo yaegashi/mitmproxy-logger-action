@@ -46,7 +46,7 @@ async function run() {
           core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=`);
         }
       } catch (error) {
-        core.warning(`Could not read traffic file state: ${error.message}`);
+        core.warning(`Could not set outputs from traffic files: ${error.message}`);
         // Set basic outputs even if we can't read the traffic file
         const proxyUrl = `http://${listenHost}:${listenPort}`;
         core.setOutput('proxy-url', proxyUrl);
