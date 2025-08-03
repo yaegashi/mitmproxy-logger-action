@@ -29,9 +29,21 @@ async function installMitmproxyCertificate(trafficDir) {
     if (platform === 'linux') {
       // Ubuntu/Debian - copy to ca-certificates directory
       try {
-        const targetPath = '/usr/local/share/ca-certificates/mitmproxy-ca-cert.crt';
+        let targetDir;
+        if (fs.existsSync('/usr/local/share/ca-certificates/')) {
+          targetDir = '/usr/local/share/ca-certificates/';
+        } else if (fs.existsSync('/etc/ssl/certs/')) {
+          targetDir = '/etc/ssl/certs/';
+        } else {
+          core.warning('No suitable CA certificates directory found on Linux. Skipping certificate installation.');
+          return;
+        }
+        const targetPath = path.join(targetDir, 'mitmproxy-ca-cert.crt');
         await exec.exec('sudo', ['cp', certPath, targetPath], { ignoreReturnCode: true });
-        await exec.exec('sudo', ['update-ca-certificates'], { ignoreReturnCode: true });
+        // Only run update-ca-certificates if using the Debian/Ubuntu directory
+        if (targetDir === '/usr/local/share/ca-certificates/') {
+          await exec.exec('sudo', ['update-ca-certificates'], { ignoreReturnCode: true });
+        }
         core.info('Successfully installed CA certificate on Linux');
       } catch (error) {
         core.warning(`Failed to install CA certificate on Linux: ${error.message}`);
