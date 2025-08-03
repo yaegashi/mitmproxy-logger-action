@@ -27582,12 +27582,12 @@ async function run() {
         
         // For Windows, set CURL_HOME and create .curlrc with ssl-no-revoke
         if (os.platform() === 'win32') {
-          const trafficDir = core.getState('mitmproxy-temp-dir');
-          if (trafficDir) {
-            core.exportVariable('CURL_HOME', trafficDir);
-            const curlrcPath = path.join(trafficDir, '.curlrc');
+          const mitmproxyDir = core.getState('mitmproxy-dir');
+          if (mitmproxyDir) {
+            core.exportVariable('CURL_HOME', mitmproxyDir);
+            const curlrcPath = path.join(mitmproxyDir, '.curlrc');
             fs.writeFileSync(curlrcPath, 'ssl-no-revoke\n');
-            core.info(`Set environment variables: http_proxy=${proxyUrl}, https_proxy=${proxyUrl}, CURL_HOME=${trafficDir}`);
+            core.info(`Set environment variables: http_proxy=${proxyUrl}, https_proxy=${proxyUrl}, CURL_HOME=${mitmproxyDir}`);
             core.info(`Created .curlrc file at: ${curlrcPath}`);
           } else {
             core.info(`Set environment variables: http_proxy=${proxyUrl}, https_proxy=${proxyUrl}`);
@@ -27598,16 +27598,16 @@ async function run() {
       }
       
       try {
-        // Get the temporary directory from state
-        let trafficDir = core.getState('mitmproxy-temp-dir');
+        // Get the directory from state
+        let mitmproxyDir = core.getState('mitmproxy-dir');
         
         // If not available in state, construct the expected path in RUNNER_TEMP
-        if (!trafficDir) {
+        if (!mitmproxyDir) {
           const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
-          trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
-          core.info(`Constructed temporary traffic directory: ${trafficDir}`);
+          mitmproxyDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+          core.info(`Constructed mitmproxy directory: ${mitmproxyDir}`);
         } else {
-          core.info(`Using temporary traffic directory from state: ${trafficDir}`);
+          core.info(`Using mitmproxy directory from state: ${mitmproxyDir}`);
         }
         
         // Get proxy URL from state or construct it
@@ -27617,25 +27617,25 @@ async function run() {
         }
         core.setOutput('proxy-url', proxyUrl);
         
-        // Get traffic file from state
-        let trafficFile = core.getState('mitmproxy-traffic-file');
-        if (!trafficFile) {
-          // Fallback: look for any .mitm files in the traffic directory
-          if (fs.existsSync(trafficDir)) {
-            const mitmFiles = fs.readdirSync(trafficDir).filter(f => f.endsWith('.mitm'));
+        // Get stream file from state
+        let streamFile = core.getState('mitmproxy-stream-file');
+        if (!streamFile) {
+          // Fallback: look for any .mitm files in the mitmproxy directory
+          if (fs.existsSync(mitmproxyDir)) {
+            const mitmFiles = fs.readdirSync(mitmproxyDir).filter(f => f.endsWith('.mitm'));
             if (mitmFiles.length > 0) {
-              trafficFile = path.join(trafficDir, mitmFiles[0]);
-              core.info(`Found traffic file: ${trafficFile}`);
+              streamFile = path.join(mitmproxyDir, mitmFiles[0]);
+              core.info(`Found stream file: ${streamFile}`);
             }
           }
         }
         
-        if (trafficFile) {
-          core.setOutput('traffic-file', trafficFile);
-          core.info(`Set traffic file output: ${trafficFile}`);
+        if (streamFile) {
+          core.setOutput('traffic-file', streamFile);
+          core.info(`Set traffic file output: ${streamFile}`);
         } else {
           core.setOutput('traffic-file', '');
-          core.warning('No traffic file found');
+          core.warning('No stream file found');
         }
         
         // Get CA certificate path from state
@@ -27647,7 +27647,7 @@ async function run() {
           core.info('No CA certificate path available');
         }
         
-        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${trafficFile || ''}, cacert-path=${cacertPath}`);
+        core.info(`Set outputs: proxy-url=${proxyUrl}, traffic-file=${streamFile || ''}, cacert-path=${cacertPath}`);
       } catch (error) {
         core.warning(`Could not set outputs from state: ${error.message}`);
         // Set basic outputs even if we can't read the traffic file

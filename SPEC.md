@@ -53,7 +53,7 @@ Additionally sets environment variables for applications:
 - `REQUESTS_CA_BUNDLE`: Path to CA certificate (Python requests library)
 - `SSL_CERT_FILE`: Path to CA certificate (curl, OpenSSL applications)
 
-### 3. Traffic Capture
+### 3. Stream Capture
 
 - **Format**: Native mitmproxy flow format (.mitm files)
 - **Location**: `RUNNER_TEMP/mitmproxy-action-traffic/`
@@ -64,7 +64,7 @@ Additionally sets environment variables for applications:
 
 - **Compression**: Password-protected ZIP archive using yazl library
 - **Encryption**: Built-in ZIP encryption with passphrase protection
-- **Contents**: Traffic files (.mitm, .har), logs, CA certificates
+- **Contents**: Stream files (.mitm, .har), logs, CA certificates
 - **Upload**: GitHub Actions artifact API for secure storage
 
 ## Configuration
@@ -85,7 +85,7 @@ Additionally sets environment variables for applications:
 | Output | Description |
 |--------|-------------|
 | `proxy-url` | Full proxy URL (e.g., `http://127.0.0.1:8080`) |
-| `traffic-file` | Path to captured traffic file |
+| `traffic-file` | Path to captured stream file |
 | `cacert-path` | Path to the CA certificate file |
 
 ## Implementation Details
@@ -94,13 +94,13 @@ Additionally sets environment variables for applications:
 
 ```
 RUNNER_TEMP/mitmproxy-action-traffic/
-├── traffic_YYYY-MM-DDTHH-MM-SS.mitm    # Traffic capture file
-├── traffic_YYYY-MM-DDTHH-MM-SS.har     # HAR format conversion
+├── stream_YYYYMMDDTHHMMSSZ.mitm         # Stream capture file
+├── stream_YYYYMMDDTHHMMSSZ.har          # HAR format conversion
 ├── mitmdump.log                         # Proxy server logs
 ├── mitmdump.pid                         # Process ID file
 ├── mitmproxy-ca-cert.pem               # CA certificate
 └── artifacts/                           # Upload staging area
-    └── mitmproxy_traffic_TIMESTAMP.zip  # Password-protected ZIP
+    └── mitmproxy_stream_YYYYMMDDTHHMMSSZ.zip  # Password-protected ZIP
 ```
 
 ### Error Handling
@@ -146,7 +146,7 @@ node dist/pre/index.js
 # Set outputs  
 node dist/main/index.js
 
-# Test traffic capture
+# Test stream capture
 curl -x http://127.0.0.1:8080 http://httpbin.org/get
 
 # Cleanup and upload
@@ -210,9 +210,9 @@ curl -x http://127.0.0.1:8080 http://httpbin.org/get
 # Check certificate installation (Linux)
 openssl verify -CAfile /usr/local/share/ca-certificates/mitmproxy-ca-cert.crt
 
-# Verify traffic capture
+# Verify stream capture
 ls -la $RUNNER_TEMP/mitmproxy-action-traffic/
 
 # Test password-protected ZIP extraction
-unzip -P your-passphrase mitmproxy_traffic_*.zip
+unzip -P your-passphrase mitmproxy_stream_*.zip
 ```

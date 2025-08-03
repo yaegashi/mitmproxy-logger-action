@@ -124,7 +124,7 @@ The action automatically handles:
 | Output | Description |
 |--------|-------------|
 | `proxy-url` | URL of the started proxy (e.g., `http://127.0.0.1:8080`) |
-| `traffic-file` | Path to the traffic log file |
+| `traffic-file` | Path to the stream log file |
 | `cacert-path` | Path to the CA certificate file |
 
 ## Certificate Installation
@@ -199,18 +199,18 @@ To disable automatic certificate installation:
 
 ## Decrypting Traffic Files
 
-To decrypt the uploaded traffic files:
+To decrypt the uploaded stream files:
 
 ```bash
 # Download and extract the artifact
-unzip mitmproxy-traffic.zip
+unzip mitmproxy-stream.zip
 cd artifacts/
 
 # Extract the password-protected ZIP file
-unzip -P your-passphrase mitmproxy_traffic_*.zip
+unzip -P your-passphrase mitmproxy_stream_*.zip
 
 # View traffic with mitmproxy
-mitmweb -r traffic_*.mitm
+mitmweb -r stream_*.mitm
 ```
 
 ## Advanced Usage
@@ -268,7 +268,7 @@ mitmweb -r traffic_*.mitm
 
 To see detailed logs, check the uploaded artifacts which include:
 - `mitmdump.log` - mitmproxy startup and operation logs
-- Traffic data file with all captured HTTP/HTTPS requests
+- Stream data file with all captured HTTP/HTTPS requests
 
 ### Testing Locally
 

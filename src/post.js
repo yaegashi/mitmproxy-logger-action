@@ -29,22 +29,22 @@ async function run() {
 
     core.info('Starting mitmproxy cleanup and artifact upload...');
 
-    // Get traffic file and PID from state
-    const trafficFile = core.getState('mitmproxy-traffic-file');
+    // Get stream file and PID from state
+    const streamFile = core.getState('mitmproxy-stream-file');
     const savedPid = core.getState('mitmproxy-pid');
-    let trafficDir = core.getState('mitmproxy-temp-dir');
+    let mitmproxyDir = core.getState('mitmproxy-dir');
     
     // If not available in state, construct the expected path in RUNNER_TEMP
-    if (!trafficDir) {
+    if (!mitmproxyDir) {
       const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
-      trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
-      core.info(`Constructed temporary traffic directory: ${trafficDir}`);
+      mitmproxyDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+      core.info(`Constructed mitmproxy directory: ${mitmproxyDir}`);
     } else {
-      core.info(`Using traffic directory from state: ${trafficDir}`);
+      core.info(`Using mitmproxy directory from state: ${mitmproxyDir}`);
     }
 
     // Stop mitmproxy first - try to use PID from state, fallback to file
-    const pidFile = path.join(trafficDir, 'mitmdump.pid');
+    const pidFile = path.join(mitmproxyDir, 'mitmdump.pid');
     let pid = savedPid;
 
     if (pid) {
@@ -107,51 +107,53 @@ async function run() {
         core.warning(`Error stopping mitmdump: ${error.message}`);
       }
     } else {
-      core.info(`No PID available. Checking if traffic directory exists...`);
-      if (fs.existsSync(trafficDir)) {
-        core.info(`Traffic directory exists: ${trafficDir}`);
-        const files = fs.readdirSync(trafficDir);
-        core.info(`Files in traffic directory: ${files.join(', ')}`);
+      core.info(`No PID available. Checking if mitmproxy directory exists...`);
+      if (fs.existsSync(mitmproxyDir)) {
+        core.info(`Mitmproxy directory exists: ${mitmproxyDir}`);
+        const files = fs.readdirSync(mitmproxyDir);
+        core.info(`Files in mitmproxy directory: ${files.join(', ')}`);
       } else {
-        core.info(`Traffic directory does not exist: ${trafficDir}`);
+        core.info(`Mitmproxy directory does not exist: ${mitmproxyDir}`);
       }
     }
 
     // Now prepare and upload artifacts
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const archiveName = `mitmproxy_traffic_${timestamp}`;
+    const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    const runNumber = process.env.GITHUB_RUN_NUMBER || 'unknown';
+    const archiveName = `mitmproxy_stream_${timestamp}`;
+    const artifactName = `mitmproxy_stream_artifact_${runNumber}`;
     
-    // Find the traffic file - use state only (no file system search)
-    let actualTrafficFile = trafficFile;
+    // Find the stream file - use state only (no file system search)
+    let actualStreamFile = streamFile;
     
-    if (!actualTrafficFile) {
-      // Check for any .mitm files in the traffic directory
-      core.info('Checking for any traffic files in directory...');
-      if (fs.existsSync(trafficDir)) {
-        const mitmFiles = fs.readdirSync(trafficDir).filter(f => f.endsWith('.mitm'));
+    if (!actualStreamFile) {
+      // Check for any .mitm files in the mitmproxy directory
+      core.info('Checking for any stream files in directory...');
+      if (fs.existsSync(mitmproxyDir)) {
+        const mitmFiles = fs.readdirSync(mitmproxyDir).filter(f => f.endsWith('.mitm'));
         if (mitmFiles.length > 0) {
-          actualTrafficFile = path.join(trafficDir, mitmFiles[0]);
-          core.info(`Found traffic file: ${actualTrafficFile}`);
+          actualStreamFile = path.join(mitmproxyDir, mitmFiles[0]);
+          core.info(`Found stream file: ${actualStreamFile}`);
         }
       }
     }
 
-    if (!actualTrafficFile || !fs.existsSync(actualTrafficFile)) {
-      core.info('No traffic file found. Creating an empty one for completeness...');
-      fs.mkdirSync(trafficDir, { recursive: true });
-      actualTrafficFile = path.join(trafficDir, 'traffic_empty.mitm');
-      fs.writeFileSync(actualTrafficFile, '');
+    if (!actualStreamFile || !fs.existsSync(actualStreamFile)) {
+      core.info('No stream file found. Creating an empty one for completeness...');
+      fs.mkdirSync(mitmproxyDir, { recursive: true });
+      actualStreamFile = path.join(mitmproxyDir, 'stream_empty.mitm');
+      fs.writeFileSync(actualStreamFile, '');
     }
 
-    const fileSize = fs.statSync(actualTrafficFile).size;
-    core.info(`Traffic file: ${actualTrafficFile}`);
-    core.info(`Traffic file size: ${fileSize} bytes`);
+    const fileSize = fs.statSync(actualStreamFile).size;
+    core.info(`Stream file: ${actualStreamFile}`);
+    core.info(`Stream file size: ${fileSize} bytes`);
 
     // Convert .mitm to .har using mitmdump hardump
     let harFile = null;
-    if (actualTrafficFile && fs.existsSync(actualTrafficFile)) {
-      const baseName = path.basename(actualTrafficFile, '.mitm');
-      harFile = path.join(path.dirname(actualTrafficFile), `${baseName}.har`);
+    if (actualStreamFile && fs.existsSync(actualStreamFile)) {
+      const baseName = path.basename(actualStreamFile, '.mitm');
+      harFile = path.join(path.dirname(actualStreamFile), `${baseName}.har`);
       
       core.info('Converting .mitm to .har using mitmdump hardump...');
       try {
@@ -159,7 +161,7 @@ async function run() {
         let mitmdumpStderr = '';
         await exec.exec('mitmdump', [
           '--no-server', 
-          '--rfile', actualTrafficFile, 
+          '--rfile', actualStreamFile, 
           '--set', `hardump=${harFile}`
         ], {
           listeners: {
@@ -194,7 +196,7 @@ async function run() {
     }
 
     // Create artifacts directory
-    const artifactDir = path.join(trafficDir, 'artifacts');
+    const artifactDir = path.join(mitmproxyDir, 'artifacts');
     fs.mkdirSync(artifactDir, { recursive: true });
 
     // Create encrypted ZIP archive with both .mitm and .har files
@@ -205,11 +207,11 @@ async function run() {
       const zipArchive = new yazl.ZipFile();
       
       // Add .mitm file with encryption
-      if (actualTrafficFile && fs.existsSync(actualTrafficFile)) {
-        zipArchive.addFile(actualTrafficFile, path.basename(actualTrafficFile), {
+      if (actualStreamFile && fs.existsSync(actualStreamFile)) {
+        zipArchive.addFile(actualStreamFile, path.basename(actualStreamFile), {
           password: passphrase
         });
-        core.info(`Added encrypted to ZIP: ${path.basename(actualTrafficFile)}`);
+        core.info(`Added encrypted to ZIP: ${path.basename(actualStreamFile)}`);
       }
       
       // Add .har file with encryption
@@ -221,7 +223,7 @@ async function run() {
       }
       
       // Add logs if available with encryption
-      const logFile = path.join(trafficDir, 'mitmdump.log');
+      const logFile = path.join(mitmproxyDir, 'mitmdump.log');
       if (fs.existsSync(logFile)) {
         zipArchive.addFile(logFile, 'mitmdump.log', {
           password: passphrase
@@ -261,7 +263,7 @@ async function run() {
       
       // Use the correct API call format for @actions/artifact v2.x
       const uploadResponse = await artifactClient.uploadArtifact(
-        archiveName,      // artifact name
+        artifactName,     // artifact name
         files,           // files to upload
         artifactDir      // root directory
       );
@@ -269,7 +271,7 @@ async function run() {
       if (uploadResponse.failedItems && uploadResponse.failedItems.length > 0) {
         core.warning(`Some files failed to upload: ${uploadResponse.failedItems.join(', ')}`);
       } else {
-        core.info(`Successfully uploaded artifact: ${archiveName}`);
+        core.info(`Successfully uploaded artifact: ${artifactName}`);
         if (uploadResponse.id) {
           core.info(`Artifact ID: ${uploadResponse.id}`);
         }
