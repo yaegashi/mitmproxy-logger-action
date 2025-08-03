@@ -38,11 +38,10 @@ async function run() {
     if (pid) {
       core.info(`Using PID from state: ${pid}`);
     } else if (fs.existsSync(pidFile)) {
+      core.info(`PID not found in state, checking PID file at: ${pidFile}`);
       pid = fs.readFileSync(pidFile, 'utf8').trim();
       core.info(`Using PID from file: ${pid}`);
     }
-
-    core.info(`Looking for PID file at: ${pidFile}`);
     
     if (pid) {
       core.info(`Stopping mitmdump process (PID: ${pid})...`);
