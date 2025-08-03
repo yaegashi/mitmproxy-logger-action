@@ -1,0 +1,58 @@
+name: Example usage of mitmproxy-logger-action on Windows
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-with-mitmproxy-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      # Install Python dependencies first (mitmproxy needs Python)
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      
+      # Start mitmproxy logging
+      - name: Start mitmproxy
+        id: mitmproxy
+        uses: yaegashi/mitmproxy-logger-action@v1
+        with:
+          enabled: true
+          listen-host: '127.0.0.1'
+          listen-port: '8080'
+          passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+      
+      # Configure your application to use the proxy
+      - name: Run tests with proxy
+        shell: powershell
+        run: |
+          # Set proxy environment variables for PowerShell/Windows
+          $env:HTTP_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          $env:HTTPS_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          
+          # Example: test HTTP requests using PowerShell
+          Invoke-WebRequest -Uri "http://httpbin.org/get" -UseBasicParsing
+          Invoke-WebRequest -Uri "https://httpbin.org/get" -UseBasicParsing
+          
+          # Your actual test commands would go here
+          # npm test
+          # python -m pytest
+          # etc.
+      
+      # Alternative using curl on Windows (if available)
+      - name: Test with curl (if available)
+        shell: cmd
+        run: |
+          set HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          set HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          curl http://httpbin.org/get
+          curl https://httpbin.org/get
+        continue-on-error: true
+      
+      # mitmproxy will automatically stop and upload artifacts when the job completes

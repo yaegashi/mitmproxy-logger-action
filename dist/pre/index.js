@@ -27559,6 +27559,7 @@ const core = __nccwpck_require__(7484);
 const exec = __nccwpck_require__(5236);
 const path = __nccwpck_require__(6928);
 const fs = __nccwpck_require__(9896);
+const os = __nccwpck_require__(857);
 
 async function run() {
   try {
@@ -27568,72 +27569,122 @@ async function run() {
     const listenPort = core.getInput('listen-port') || '8080';
     const passphrase = core.getInput('passphrase');
 
-    // Get the action path and run the start script
-    // When running in GitHub Actions, GITHUB_ACTION_PATH points to the action root
-    // When building/testing locally, we need to go up from dist/pre to the repository root
-    const actionPath = process.env.GITHUB_ACTION_PATH || path.resolve(__dirname, '..', '..');
-    const scriptPath = path.join(actionPath, 'scripts', 'start.sh');
-    
-    // Pass environment variables to the script, especially GITHUB_OUTPUT
-    await exec.exec('bash', [scriptPath], {
-      env: {
-        ...process.env,
-        INPUT_ENABLED: enabled,
-        INPUT_LISTEN_HOST: listenHost,
-        INPUT_LISTEN_PORT: listenPort,
-        INPUT_PASSPHRASE: passphrase
-      }
-    });
-    
-    // Save state for main action to set outputs (outputs from pre are not accessible in workflows)
-    if (enabled === 'true') {
-      // Save inputs as state so main can access them
-      core.saveState('mitmproxy-enabled', enabled);
-      core.saveState('mitmproxy-listen-host', listenHost);
-      core.saveState('mitmproxy-listen-port', listenPort);
-      
-      // Read the temporary directory path directly from RUNNER_TEMP
-      const runnerTemp = process.env.RUNNER_TEMP;
-      if (runnerTemp) {
-        const tempDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
-        core.saveState('mitmproxy-temp-dir', tempDir);
-        core.info(`Saved temporary traffic directory: ${tempDir}`);
-        
-        // Wait a moment for the script to finish writing files
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Read and save additional file paths from the temporary directory
-        try {
-          const trafficFilePath = path.join(tempDir, 'traffic_file_path.txt');
-          const pidFilePath = path.join(tempDir, 'mitmdump.pid');
-          const proxyUrlPath = path.join(tempDir, 'proxy_url.txt');
-          
-          if (fs.existsSync(trafficFilePath)) {
-            const trafficFile = fs.readFileSync(trafficFilePath, 'utf8').trim();
-            core.saveState('mitmproxy-traffic-file', trafficFile);
-          }
-          
-          if (fs.existsSync(pidFilePath)) {
-            const pid = fs.readFileSync(pidFilePath, 'utf8').trim();
-            core.saveState('mitmproxy-pid', pid);
-          }
-          
-          if (fs.existsSync(proxyUrlPath)) {
-            const proxyUrl = fs.readFileSync(proxyUrlPath, 'utf8').trim();
-            core.saveState('mitmproxy-proxy-url', proxyUrl);
-          }
-        } catch (error) {
-          core.warning(`Could not read some temporary files: ${error.message}`);
-        }
-      } else {
-        core.warning('RUNNER_TEMP environment variable not available');
-      }
-      
-      core.info('mitmproxy setup completed, main action will set outputs');
-    } else {
+    // Check if mitmproxy is enabled
+    if (enabled !== 'true') {
+      core.info('mitmproxy is disabled, skipping...');
       core.saveState('mitmproxy-enabled', 'false');
-      core.info('mitmproxy is disabled');
+      return;
     }
+
+    core.info('Starting mitmproxy logger...');
+
+    // Install mitmproxy if not already installed
+    try {
+      await exec.exec('mitmdump', ['--version'], { silent: true });
+      core.info('mitmproxy is already installed');
+    } catch (error) {
+      core.info('Installing mitmproxy...');
+      await exec.exec('pip', ['install', 'mitmproxy']);
+    }
+
+    // Create traffic directory in RUNNER_TEMP to avoid workspace cleanup issues
+    const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
+    const trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+    
+    fs.mkdirSync(trafficDir, { recursive: true });
+
+    // Generate traffic file name with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const trafficFile = path.join(trafficDir, `traffic_${timestamp}.mitm`);
+
+    // Start mitmdump in background
+    core.info(`Starting mitmdump on ${listenHost}:${listenPort}`);
+    core.info(`Traffic will be saved to: ${trafficFile}`);
+
+    const logFile = path.join(trafficDir, 'mitmdump.log');
+    const pidFile = path.join(trafficDir, 'mitmdump.pid');
+
+    // Start mitmdump with flow file output
+    const mitmdumpArgs = [
+      '--listen-host', listenHost,
+      '--listen-port', listenPort,
+      '--save-stream-file', trafficFile,
+      '--set', `confdir=${trafficDir}`
+    ];
+
+    // On Windows, we need to handle process spawning differently
+    let mitmdumpProcess;
+    if (os.platform() === 'win32') {
+      // Use spawn to get the process object for Windows
+      const { spawn } = __nccwpck_require__(5317);
+      mitmdumpProcess = spawn('mitmdump', mitmdumpArgs, {
+        detached: false,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+
+      // Write logs to file
+      const logStream = fs.createWriteStream(logFile);
+      mitmdumpProcess.stdout.pipe(logStream);
+      mitmdumpProcess.stderr.pipe(logStream);
+
+      // Save the PID for cleanup
+      fs.writeFileSync(pidFile, mitmdumpProcess.pid.toString());
+    } else {
+      // Use exec for Unix systems, redirecting output to log file
+      const { spawn } = __nccwpck_require__(5317);
+      mitmdumpProcess = spawn('mitmdump', mitmdumpArgs, {
+        detached: true,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+
+      // Write logs to file
+      const logStream = fs.createWriteStream(logFile);
+      mitmdumpProcess.stdout.pipe(logStream);
+      mitmdumpProcess.stderr.pipe(logStream);
+
+      // Save the PID for cleanup
+      fs.writeFileSync(pidFile, mitmdumpProcess.pid.toString());
+      
+      // Unref the process so it doesn't keep the Node.js process alive
+      mitmdumpProcess.unref();
+    }
+
+    // Wait a moment for the proxy to start
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Check if the process is still running
+    if (mitmdumpProcess.killed || mitmdumpProcess.exitCode !== null) {
+      core.error('Failed to start mitmdump. Check logs:');
+      if (fs.existsSync(logFile)) {
+        const logs = fs.readFileSync(logFile, 'utf8');
+        core.error(logs);
+      }
+      throw new Error('Failed to start mitmdump');
+    }
+
+    // Save outputs for JavaScript to read
+    const proxyUrl = `http://${listenHost}:${listenPort}`;
+
+    // Save traffic file path for later use
+    fs.writeFileSync(path.join(trafficDir, 'traffic_file_path.txt'), trafficFile);
+
+    // Save proxy URL for JavaScript to read
+    fs.writeFileSync(path.join(trafficDir, 'proxy_url.txt'), proxyUrl);
+
+    core.info(`mitmproxy started successfully at ${proxyUrl}`);
+    core.info(`PID: ${mitmdumpProcess.pid}`);
+    core.info(`Traffic file: ${trafficFile}`);
+
+    // Save state for main action to set outputs (outputs from pre are not accessible in workflows)
+    core.saveState('mitmproxy-enabled', enabled);
+    core.saveState('mitmproxy-listen-host', listenHost);
+    core.saveState('mitmproxy-listen-port', listenPort);
+    core.saveState('mitmproxy-temp-dir', trafficDir);
+    core.saveState('mitmproxy-traffic-file', trafficFile);
+    core.saveState('mitmproxy-pid', mitmdumpProcess.pid.toString());
+    core.saveState('mitmproxy-proxy-url', proxyUrl);
+
+    core.info('mitmproxy setup completed, main action will set outputs');
   } catch (error) {
     core.setFailed(`Pre action failed: ${error.message}`);
   }

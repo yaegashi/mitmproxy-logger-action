@@ -3,6 +3,7 @@ const exec = require('@actions/exec');
 const artifact = require('@actions/artifact');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 async function run() {
   try {
@@ -17,10 +18,6 @@ async function run() {
 
     core.info('Starting mitmproxy cleanup and artifact upload...');
 
-    // Set environment variables for the script
-    process.env.INPUT_ENABLED = enabled;
-    process.env.INPUT_PASSPHRASE = passphrase;
-    
     // Get traffic file and PID from state
     const trafficFile = core.getState('mitmproxy-traffic-file');
     const savedPid = core.getState('mitmproxy-pid');
@@ -28,21 +25,11 @@ async function run() {
     
     // If not available in state, construct the expected path in RUNNER_TEMP
     if (!trafficDir) {
-      const runnerTemp = process.env.RUNNER_TEMP;
-      if (runnerTemp) {
-        trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
-        core.info(`Constructed temporary traffic directory: ${trafficDir}`);
-      } else {
-        core.warning('Could not determine temporary directory path');
-        return;
-      }
+      const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
+      trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+      core.info(`Constructed temporary traffic directory: ${trafficDir}`);
     } else {
       core.info(`Using traffic directory from state: ${trafficDir}`);
-    }
-    
-    if (trafficFile) {
-      process.env.TRAFFIC_FILE = trafficFile;
-      core.info(`Using traffic file from state: ${trafficFile}`);
     }
 
     // Stop mitmproxy first - try to use PID from state, fallback to file
@@ -61,17 +48,23 @@ async function run() {
       core.info(`Stopping mitmdump process (PID: ${pid})...`);
       
       try {
-        // Check if process is still running first
-        const { exitCode } = await exec.getExecOutput('kill', ['-0', pid], { ignoreReturnCode: true });
-        if (exitCode === 0) {
-          // Process is running, try to kill it gracefully
-          await exec.exec('kill', ['-TERM', pid], { ignoreReturnCode: true });
-          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
-          
-          // Check if still running and force kill if needed
-          const { exitCode: stillRunning } = await exec.getExecOutput('kill', ['-0', pid], { ignoreReturnCode: true });
-          if (stillRunning === 0) {
-            await exec.exec('kill', ['-KILL', pid], { ignoreReturnCode: true });
+        if (os.platform() === 'win32') {
+          // Windows process termination
+          await exec.exec('taskkill', ['/PID', pid, '/F'], { ignoreReturnCode: true });
+        } else {
+          // Unix process termination
+          // Check if process is still running first
+          const { exitCode } = await exec.getExecOutput('kill', ['-0', pid], { ignoreReturnCode: true });
+          if (exitCode === 0) {
+            // Process is running, try to kill it gracefully
+            await exec.exec('kill', ['-TERM', pid], { ignoreReturnCode: true });
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+            
+            // Check if still running and force kill if needed
+            const { exitCode: stillRunning } = await exec.getExecOutput('kill', ['-0', pid], { ignoreReturnCode: true });
+            if (stillRunning === 0) {
+              await exec.exec('kill', ['-KILL', pid], { ignoreReturnCode: true });
+            }
           }
         }
         
@@ -133,10 +126,30 @@ async function run() {
     const artifactDir = path.join(trafficDir, 'artifacts');
     fs.mkdirSync(artifactDir, { recursive: true });
 
-    // Compress the traffic file
+    // Compress the traffic file - use cross-platform approach
     core.info('Compressing traffic file...');
     const compressedFile = path.join(artifactDir, `${archiveName}.tar.gz`);
-    await exec.exec('tar', ['-czf', compressedFile, '-C', path.dirname(actualTrafficFile), path.basename(actualTrafficFile)]);
+    
+    if (os.platform() === 'win32') {
+      // On Windows, use PowerShell to create compressed archive
+      // First try tar if available (Windows 10 1803+ has tar.exe)
+      try {
+        await exec.exec('tar', ['-czf', compressedFile, '-C', path.dirname(actualTrafficFile), path.basename(actualTrafficFile)]);
+      } catch (error) {
+        core.warning('tar command not available on Windows, using PowerShell compression');
+        // Fallback to PowerShell compression
+        const zipFile = path.join(artifactDir, `${archiveName}.zip`);
+        await exec.exec('powershell', [
+          '-Command',
+          `Compress-Archive -Path "${actualTrafficFile}" -DestinationPath "${zipFile}"`
+        ]);
+        // Rename for consistency
+        fs.renameSync(zipFile, compressedFile);
+      }
+    } else {
+      // Unix systems
+      await exec.exec('tar', ['-czf', compressedFile, '-C', path.dirname(actualTrafficFile), path.basename(actualTrafficFile)]);
+    }
 
     let finalFile = compressedFile;
 
@@ -144,15 +157,26 @@ async function run() {
     if (passphrase) {
       core.info('Encrypting traffic file...');
       const encryptedFile = path.join(artifactDir, `${archiveName}.tar.gz.enc`);
-      await exec.exec('openssl', [
-        'enc', '-aes-256-cbc', '-salt', '-pbkdf2',
-        '-in', compressedFile,
-        '-out', encryptedFile,
-        '-pass', `pass:${passphrase}`
-      ]);
-      fs.unlinkSync(compressedFile);
-      finalFile = encryptedFile;
-      core.info('Traffic file encrypted successfully');
+      
+      // Check if openssl is available
+      try {
+        await exec.exec('openssl', [
+          'enc', '-aes-256-cbc', '-salt', '-pbkdf2',
+          '-in', compressedFile,
+          '-out', encryptedFile,
+          '-pass', `pass:${passphrase}`
+        ]);
+        fs.unlinkSync(compressedFile);
+        finalFile = encryptedFile;
+        core.info('Traffic file encrypted successfully');
+      } catch (error) {
+        if (os.platform() === 'win32') {
+          core.warning('OpenSSL not available on Windows, skipping encryption. Install OpenSSL for encryption support.');
+          core.warning('File will be uploaded without encryption.');
+        } else {
+          throw error;
+        }
+      }
     } else {
       core.warning('No passphrase provided, file will not be encrypted');
     }
