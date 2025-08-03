@@ -29,6 +29,8 @@ jobs:
           INPUT_ENABLED=true \
           INPUT_LISTEN_HOST=127.0.0.1 \
           INPUT_LISTEN_PORT=8080 \
+          INPUT_INSTALL_CACERT=true \
+          INPUT_SET_ENVVARS=true \
           INPUT_PASSPHRASE=test-passphrase-123 \
           node dist/main/index.js
           

@@ -38,15 +38,18 @@ jobs:
           enabled: true
           listen-host: '127.0.0.1'
           listen-port: '8080'
-          install-certificate: true
+          install-cacert: true
+          set-envvars: true
           passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
       
       # Your test steps that generate HTTP traffic
       - name: Run tests
         run: |
-          # Configure your application to use the proxy
-          export HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
-          export HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          # With set-envvars: true (default), proxy environment variables are automatically set
+          # Alternatively, you can configure your application manually:
+          # export HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          # export HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          
           # Run your tests
           npm test
       
@@ -79,16 +82,19 @@ jobs:
           enabled: true
           listen-host: '127.0.0.1'
           listen-port: '8080'
-          install-certificate: true
+          install-cacert: true
+          set-envvars: true
           passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
       
       # Your test steps that generate HTTP traffic
       - name: Run tests
         shell: powershell
         run: |
-          # Configure your application to use the proxy
-          $env:HTTP_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
-          $env:HTTPS_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # With set-envvars: true (default), proxy environment variables are automatically set
+          # Alternatively, you can configure your application manually:
+          # $env:HTTP_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # $env:HTTPS_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          
           # Run your tests
           npm test
       
@@ -109,7 +115,8 @@ The action automatically handles:
 | `enabled` | Enable mitmproxy logging (true/false) | No | `true` |
 | `listen-host` | Proxy listen address | No | `127.0.0.1` |
 | `listen-port` | Proxy listen port | No | `8080` |
-| `install-certificate` | Install mitmproxy CA certificate to system trust store (true/false) | No | `true` |
+| `install-cacert` | Install mitmproxy CA certificate to system trust store (true/false) | No | `true` |
+| `set-envvars` | Set proxy environment variables automatically (true/false) | No | `true` |
 | `passphrase` | Passphrase for artifact encryption | Yes | - |
 
 ## Outputs
@@ -118,10 +125,11 @@ The action automatically handles:
 |--------|-------------|
 | `proxy-url` | URL of the started proxy (e.g., `http://127.0.0.1:8080`) |
 | `traffic-file` | Path to the traffic log file |
+| `cacert-path` | Path to the CA certificate file |
 
 ## Certificate Installation
 
-The action automatically installs mitmproxy's CA certificate to the system trust store when `install-certificate` is set to `true` (default). This enables seamless HTTPS traffic interception without certificate warnings.
+The action automatically installs mitmproxy's CA certificate to the system trust store when `install-cacert` is set to `true` (default). This enables seamless HTTPS traffic interception without certificate warnings.
 
 ### Platform Support
 
@@ -131,9 +139,26 @@ The action automatically installs mitmproxy's CA certificate to the system trust
 
 ### Environment Variables
 
+When `set-envvars` is set to `true` (default), the action automatically sets these proxy environment variables:
+- `http_proxy`: Set to the proxy URL (e.g., `http://127.0.0.1:8080`)  
+- `https_proxy`: Set to the proxy URL (e.g., `http://127.0.0.1:8080`)
+- `CURL_OPTIONS`: Set to `--ssl-no-revoke` for better SSL handling
+
 The action also sets these environment variables for applications that use them:
 - `REQUESTS_CA_BUNDLE`: For Python requests library
 - `SSL_CERT_FILE`: For curl and OpenSSL-based applications
+
+### Disabling Environment Variables
+
+To disable automatic environment variable setting:
+
+```yaml
+- name: Start mitmproxy
+  uses: yaegashi/mitmproxy-logger-action@v1
+  with:
+    set-envvars: false
+    passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+```
 
 ### Disabling Certificate Installation
 
@@ -143,7 +168,7 @@ To disable automatic certificate installation:
 - name: Start mitmproxy
   uses: yaegashi/mitmproxy-logger-action@v1
   with:
-    install-certificate: false
+    install-cacert: false
     passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
 ```
 
@@ -151,27 +176,26 @@ To disable automatic certificate installation:
 
 ### Ubuntu/macOS
 - Full support for all features
-- Encryption using OpenSSL
-- Compression using tar
+- Password-protected ZIP encryption using yazl library
+- Compression using ZIP format
 
 ### Windows
 - Full support for all features  
 - **Note:** Requires Python to be available (use `actions/setup-python@v4`)
-- Encryption using OpenSSL (if available, otherwise files uploaded without encryption)
-- Compression using tar (Windows 10 1803+) or PowerShell fallback
+- Password-protected ZIP encryption using yazl library
+- Compression using ZIP format
 - See `examples/basic-usage-windows.yml` for a complete Windows example
 
 ## Security Notes
 
 - The `passphrase` input should be stored as a GitHub secret
-- Traffic files are encrypted using AES-256-CBC before upload (when OpenSSL is available)
+- Traffic files are encrypted using password-protected ZIP format before upload
 - Temporary files are cleaned up after artifact creation
 - The proxy only listens on localhost by default
 
 ### Windows Security Notes
-- On Windows, if OpenSSL is not available, files will be uploaded without encryption
-- Install OpenSSL on Windows runners for full encryption support
-- PowerShell compression is used as fallback when tar is not available
+- Full encryption support using password-protected ZIP format
+- No additional dependencies required for encryption
 
 ## Decrypting Traffic Files
 
@@ -182,12 +206,8 @@ To decrypt the uploaded traffic files:
 unzip mitmproxy-traffic.zip
 cd artifacts/
 
-# Decrypt the file
-openssl enc -aes-256-cbc -d -pbkdf2 -in mitmproxy_traffic_*.tar.gz.enc -out decrypted.tar.gz
-# Enter your passphrase when prompted
-
-# Extract the traffic file
-tar -xzf decrypted.tar.gz
+# Extract the password-protected ZIP file
+unzip -P your-passphrase mitmproxy_traffic_*.zip
 
 # View traffic with mitmproxy
 mitmweb -r traffic_*.mitm
