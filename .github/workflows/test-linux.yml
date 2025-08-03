@@ -1,0 +1,27 @@
+name: Testing mitmproxy on Linux
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-with-mitmproxy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start mitmproxy
+        id: mitmproxy
+        uses: yaegashi/mitmproxy-logger-action@main
+        with:
+          enabled: true
+          listen-host: '127.0.0.1'
+          listen-port: '8080'
+          passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+      
+      - name: Run tests with proxy
+        run: |
+          set -x
+          curl -v http://httpbin.org/get
+          curl -v https://httpbin.org/get
