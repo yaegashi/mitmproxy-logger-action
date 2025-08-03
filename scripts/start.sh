@@ -4,8 +4,7 @@ set -e
 # Check if mitmproxy is enabled
 if [ "$INPUT_ENABLED" != "true" ]; then
     echo "mitmproxy is disabled, skipping..."
-    echo "proxy-url=" >> $GITHUB_OUTPUT
-    echo "traffic-file=" >> $GITHUB_OUTPUT
+    # JavaScript will handle setting empty outputs
     exit 0
 fi
 
@@ -51,13 +50,14 @@ if ! kill -0 "$MITMDUMP_PID" 2>/dev/null; then
     exit 1
 fi
 
-# Set outputs
+# Save outputs for JavaScript to read
 PROXY_URL="http://${INPUT_LISTEN_HOST}:${INPUT_LISTEN_PORT}"
-echo "proxy-url=$PROXY_URL" >> $GITHUB_OUTPUT
-echo "traffic-file=$TRAFFIC_FILE" >> $GITHUB_OUTPUT
 
 # Save traffic file path for later use
 echo "$TRAFFIC_FILE" > "${TRAFFIC_DIR}/traffic_file_path.txt"
+
+# Save proxy URL for JavaScript to read
+echo "$PROXY_URL" > "${TRAFFIC_DIR}/proxy_url.txt"
 
 echo "mitmproxy started successfully at $PROXY_URL"
 echo "PID: $MITMDUMP_PID"

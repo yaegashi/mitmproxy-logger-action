@@ -1,0 +1,53 @@
+name: Test Output Fix
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-outputs:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+      
+      # Build the action locally for testing
+      - name: Build action
+        run: |
+          npm install
+          npm run build
+      
+      # Test the action with the fix
+      - name: Test mitmproxy action
+        id: mitmproxy
+        uses: ./
+        with:
+          enabled: true
+          listen-host: '127.0.0.1'
+          listen-port: '8080'
+          passphrase: 'test-passphrase-12345'
+      
+      # Test that outputs are accessible
+      - name: Test outputs
+        run: |
+          echo "Testing outputs..."
+          echo "proxy-url output: '${{ steps.mitmproxy.outputs.proxy-url }}'"
+          echo "traffic-file output: '${{ steps.mitmproxy.outputs.traffic-file }}'"
+          
+          # Check if proxy-url is not empty
+          if [ -z "${{ steps.mitmproxy.outputs.proxy-url }}" ]; then
+            echo "❌ ERROR: proxy-url is empty!"
+            exit 1
+          else
+            echo "✅ SUCCESS: proxy-url is set to: ${{ steps.mitmproxy.outputs.proxy-url }}"
+          fi
+          
+          # Test that we can use the proxy URL
+          export HTTP_PROXY="${{ steps.mitmproxy.outputs.proxy-url }}"
+          export HTTPS_PROXY="${{ steps.mitmproxy.outputs.proxy-url }}"
+          echo "HTTP_PROXY=$HTTP_PROXY"
+          echo "HTTPS_PROXY=$HTTPS_PROXY"
+          
+          # Make a test request through the proxy
+          echo "Testing HTTP request through proxy..."
+          curl -x "${{ steps.mitmproxy.outputs.proxy-url }}" --connect-timeout 10 http://httpbin.org/get || echo "Request failed (expected if mitmdump isn't fully ready)"
