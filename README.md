@@ -2,6 +2,8 @@
 
 A GitHub Action that automatically captures HTTP/HTTPS traffic using mitmproxy during your workflow and uploads the traffic data as encrypted artifacts. The action handles the complete lifecycle - from installing and starting the proxy to stopping it and uploading artifacts when your job completes.
 
+**✅ Cross-platform:** Works on Ubuntu, macOS, and Windows runners.
+
 ## Features
 
 - Starts mitmdump proxy on specified host/port
@@ -10,10 +12,12 @@ A GitHub Action that automatically captures HTTP/HTTPS traffic using mitmproxy d
 - Uploads traffic data as GitHub Actions artifacts
 - Configurable proxy settings
 - Easy cleanup and artifact management
+- **Cross-platform support** (Ubuntu, macOS, Windows)
+- **Pure Node.js implementation** (no bash scripts required)
 
 ## Usage
 
-### Basic Usage
+### Basic Usage (Ubuntu/macOS)
 
 ```yaml
 name: Test with mitmproxy logging
@@ -47,6 +51,47 @@ jobs:
       # mitmproxy will automatically stop and upload artifacts when the job completes
 ```
 
+### Basic Usage (Windows)
+
+```yaml
+name: Test with mitmproxy logging on Windows
+on: [push]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Setup Python (required for mitmproxy)
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      
+      # Start mitmproxy logging
+      - name: Start mitmproxy
+        id: mitmproxy
+        uses: yaegashi/mitmproxy-logger-action@v1
+        with:
+          enabled: true
+          listen-host: '127.0.0.1'
+          listen-port: '8080'
+          passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
+      
+      # Your test steps that generate HTTP traffic
+      - name: Run tests
+        shell: powershell
+        run: |
+          # Configure your application to use the proxy
+          $env:HTTP_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          $env:HTTPS_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # Run your tests
+          npm test
+      
+      # mitmproxy will automatically stop and upload artifacts when the job completes
+```
+
 The action automatically handles:
 - Installing mitmproxy dependencies (pre-step)
 - Starting the proxy server (pre-step)  
@@ -70,12 +115,31 @@ The action automatically handles:
 | `proxy-url` | URL of the started proxy (e.g., `http://127.0.0.1:8080`) |
 | `traffic-file` | Path to the traffic log file |
 
+## Platform Support
+
+### Ubuntu/macOS
+- Full support for all features
+- Encryption using OpenSSL
+- Compression using tar
+
+### Windows
+- Full support for all features  
+- **Note:** Requires Python to be available (use `actions/setup-python@v4`)
+- Encryption using OpenSSL (if available, otherwise files uploaded without encryption)
+- Compression using tar (Windows 10 1803+) or PowerShell fallback
+- See `examples/basic-usage-windows.yml` for a complete Windows example
+
 ## Security Notes
 
 - The `passphrase` input should be stored as a GitHub secret
-- Traffic files are encrypted using AES-256-CBC before upload
+- Traffic files are encrypted using AES-256-CBC before upload (when OpenSSL is available)
 - Temporary files are cleaned up after artifact creation
 - The proxy only listens on localhost by default
+
+### Windows Security Notes
+- On Windows, if OpenSSL is not available, files will be uploaded without encryption
+- Install OpenSSL on Windows runners for full encryption support
+- PowerShell compression is used as fallback when tar is not available
 
 ## Decrypting Traffic Files
 
@@ -156,23 +220,55 @@ To see detailed logs, check the uploaded artifacts which include:
 
 ### Testing Locally
 
-You can test the scripts locally (outside GitHub Actions):
+You can test the action locally by running the Node.js scripts directly:
+
 ```bash
-export GITHUB_WORKSPACE="/tmp/test"
+# Set up environment variables
 export INPUT_ENABLED="true"
 export INPUT_LISTEN_HOST="127.0.0.1"
 export INPUT_LISTEN_PORT="8080"
 export INPUT_PASSPHRASE="your-test-passphrase"
+export RUNNER_TEMP="/tmp"
 
-# Start mitmproxy
-./scripts/start.sh
+# Install dependencies
+npm install
+
+# Build the action
+npm run build
+
+# Start mitmproxy (pre action)
+node dist/pre/index.js
 
 # Test proxy
 curl -x http://127.0.0.1:8080 http://httpbin.org/get
 
-# Stop and upload
-./scripts/stop.sh
-./scripts/upload-artifacts.sh
+# Stop and upload (post action)
+node dist/post/index.js
+```
+
+On Windows PowerShell:
+```powershell
+# Set up environment variables
+$env:INPUT_ENABLED = "true"
+$env:INPUT_LISTEN_HOST = "127.0.0.1"
+$env:INPUT_LISTEN_PORT = "8080"
+$env:INPUT_PASSPHRASE = "your-test-passphrase"
+$env:RUNNER_TEMP = "$env:TEMP"
+
+# Install dependencies
+npm install
+
+# Build the action
+npm run build
+
+# Start mitmproxy (pre action)
+node dist/pre/index.js
+
+# Test proxy
+Invoke-WebRequest -Uri "http://httpbin.org/get" -Proxy "http://127.0.0.1:8080" -UseBasicParsing
+
+# Stop and upload (post action)  
+node dist/post/index.js
 ```
 
 ## License

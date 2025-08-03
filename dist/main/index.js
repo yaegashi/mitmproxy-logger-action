@@ -27558,6 +27558,7 @@ var __webpack_exports__ = {};
 const core = __nccwpck_require__(7484);
 const path = __nccwpck_require__(6928);
 const fs = __nccwpck_require__(9896);
+const os = __nccwpck_require__(857);
 
 async function run() {
   try {
@@ -27577,13 +27578,9 @@ async function run() {
         
         // If not available in state, construct the expected path in RUNNER_TEMP
         if (!trafficDir) {
-          const runnerTemp = process.env.RUNNER_TEMP;
-          if (runnerTemp) {
-            trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
-            core.info(`Constructed temporary traffic directory: ${trafficDir}`);
-          } else {
-            throw new Error('RUNNER_TEMP environment variable is not available and no temporary directory found in state');
-          }
+          const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
+          trafficDir = path.join(runnerTemp, 'mitmproxy-action-traffic');
+          core.info(`Constructed temporary traffic directory: ${trafficDir}`);
         } else {
           core.info(`Using temporary traffic directory from state: ${trafficDir}`);
         }
