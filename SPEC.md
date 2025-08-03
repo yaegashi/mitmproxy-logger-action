@@ -62,8 +62,8 @@ Additionally sets environment variables for applications:
 
 ### 4. Artifact Management
 
-- **Compression**: ZIP archive with password protection
-- **Encryption**: File-level encryption using provided passphrase
+- **Compression**: Password-protected ZIP archive using yazl library
+- **Encryption**: Built-in ZIP encryption with passphrase protection
 - **Contents**: Traffic files (.mitm, .har), logs, CA certificates
 - **Upload**: GitHub Actions artifact API for secure storage
 
@@ -76,7 +76,8 @@ Additionally sets environment variables for applications:
 | `enabled` | boolean | `true` | Enable/disable mitmproxy logging |
 | `listen-host` | string | `127.0.0.1` | Proxy server bind address |
 | `listen-port` | string | `8080` | Proxy server port |
-| `install-certificate` | boolean | `true` | Install CA certificate to system trust store |
+| `install-cacert` | boolean | `true` | Install CA certificate to system trust store |
+| `set-envvars` | boolean | `true` | Set proxy environment variables automatically |
 | `passphrase` | string | required | Encryption passphrase for artifacts |
 
 ### Outputs
@@ -85,6 +86,7 @@ Additionally sets environment variables for applications:
 |--------|-------------|
 | `proxy-url` | Full proxy URL (e.g., `http://127.0.0.1:8080`) |
 | `traffic-file` | Path to captured traffic file |
+| `cacert-path` | Path to the CA certificate file |
 
 ## Implementation Details
 
@@ -98,7 +100,7 @@ RUNNER_TEMP/mitmproxy-action-traffic/
 ├── mitmdump.pid                         # Process ID file
 ├── mitmproxy-ca-cert.pem               # CA certificate
 └── artifacts/                           # Upload staging area
-    └── mitmproxy_traffic_TIMESTAMP.zip
+    └── mitmproxy_traffic_TIMESTAMP.zip  # Password-protected ZIP
 ```
 
 ### Error Handling
@@ -111,7 +113,7 @@ RUNNER_TEMP/mitmproxy-action-traffic/
 ### Security Considerations
 
 - **Local Binding**: Proxy binds to localhost by default for security
-- **Encrypted Storage**: All artifacts encrypted before upload
+- **Encrypted Storage**: All artifacts encrypted using password-protected ZIP format before upload
 - **Temporary Cleanup**: Automatic cleanup of sensitive temporary files
 - **Certificate Scope**: CA certificates only affect current runner environment
 
@@ -134,7 +136,7 @@ Set environment variables and run individual hooks:
 export INPUT_ENABLED="true"
 export INPUT_LISTEN_HOST="127.0.0.1" 
 export INPUT_LISTEN_PORT="8080"
-export INPUT_INSTALL_CERTIFICATE="true"
+export INPUT_INSTALL_CACERT="true"
 export INPUT_PASSPHRASE="test-passphrase"
 export RUNNER_TEMP="/tmp"
 
@@ -164,7 +166,7 @@ Verify certificate installation on each supported platform:
 - `@actions/core`: GitHub Actions runtime API
 - `@actions/exec`: Process execution utilities  
 - `@actions/artifact`: Artifact upload API
-- `yazl`: ZIP archive creation with encryption
+- `yazl`: ZIP archive creation with password protection
 - `@vercel/ncc`: Bundling for distribution
 
 ## Future Enhancements
@@ -210,4 +212,7 @@ openssl verify -CAfile /usr/local/share/ca-certificates/mitmproxy-ca-cert.crt
 
 # Verify traffic capture
 ls -la $RUNNER_TEMP/mitmproxy-action-traffic/
+
+# Test password-protected ZIP extraction
+unzip -P your-passphrase mitmproxy_traffic_*.zip
 ```

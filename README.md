@@ -176,27 +176,26 @@ To disable automatic certificate installation:
 
 ### Ubuntu/macOS
 - Full support for all features
-- Encryption using OpenSSL
-- Compression using tar
+- Password-protected ZIP encryption using yazl library
+- Compression using ZIP format
 
 ### Windows
 - Full support for all features  
 - **Note:** Requires Python to be available (use `actions/setup-python@v4`)
-- Encryption using OpenSSL (if available, otherwise files uploaded without encryption)
-- Compression using tar (Windows 10 1803+) or PowerShell fallback
+- Password-protected ZIP encryption using yazl library
+- Compression using ZIP format
 - See `examples/basic-usage-windows.yml` for a complete Windows example
 
 ## Security Notes
 
 - The `passphrase` input should be stored as a GitHub secret
-- Traffic files are encrypted using AES-256-CBC before upload (when OpenSSL is available)
+- Traffic files are encrypted using password-protected ZIP format before upload
 - Temporary files are cleaned up after artifact creation
 - The proxy only listens on localhost by default
 
 ### Windows Security Notes
-- On Windows, if OpenSSL is not available, files will be uploaded without encryption
-- Install OpenSSL on Windows runners for full encryption support
-- PowerShell compression is used as fallback when tar is not available
+- Full encryption support using password-protected ZIP format
+- No additional dependencies required for encryption
 
 ## Decrypting Traffic Files
 
@@ -207,12 +206,8 @@ To decrypt the uploaded traffic files:
 unzip mitmproxy-traffic.zip
 cd artifacts/
 
-# Decrypt the file
-openssl enc -aes-256-cbc -d -pbkdf2 -in mitmproxy_traffic_*.tar.gz.enc -out decrypted.tar.gz
-# Enter your passphrase when prompted
-
-# Extract the traffic file
-tar -xzf decrypted.tar.gz
+# Extract the password-protected ZIP file
+unzip -P your-passphrase mitmproxy_traffic_*.zip
 
 # View traffic with mitmproxy
 mitmweb -r traffic_*.mitm
