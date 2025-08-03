@@ -27584,7 +27584,7 @@ async function run() {
       core.info('mitmproxy is already installed');
     } catch (error) {
       core.info('Installing mitmproxy...');
-      await exec.exec('pip', ['install', 'mitmproxy']);
+      await exec.exec('pip', ['install', '--upgrade', 'mitmproxy']);
     }
 
     // Create traffic directory in RUNNER_TEMP to avoid workspace cleanup issues
