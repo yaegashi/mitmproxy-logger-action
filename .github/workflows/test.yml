@@ -2,6 +2,8 @@ name: Test mitmproxy-logger-action
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -13,40 +15,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Install Node.js dependencies for testing
+      - name: Install Node.js dependencies
         run: |
           npm install
           npm run build
       
-      - name: Test standalone bundle execution
-        run: |
-          # Test that bundles are truly standalone and don't require external dependencies
-          npm run test:standalone
-      
-      - name: Test bundled files exist and execute
-        run: |
-          # Test that bundled files exist
-          test -f dist/main/index.js
-          test -f dist/pre/index.js  
-          test -f dist/post/index.js
-          
-          # Test that main action can execute
-          INPUT_ENABLED=true \
-          INPUT_LISTEN_HOST=127.0.0.1 \
-          INPUT_LISTEN_PORT=8080 \
-          INPUT_INSTALL_CACERT=true \
-          INPUT_SET_ENVVARS=true \
-          INPUT_PASSPHRASE=test-passphrase-123 \
-          node dist/main/index.js
-          
-          echo "✅ Main action executed successfully"
-      
-      - name: Test action metadata
-        run: |
-          # Verify action.yml has correct structure
-          grep -q "using: 'node20'" action.yml
-          grep -q "main: 'dist/main/index.js'" action.yml
-          grep -q "pre: 'dist/pre/index.js'" action.yml
-          grep -q "post: 'dist/post/index.js'" action.yml
-          
-          echo "✅ Action metadata is correct"
+      - name: Run tests
+        run: npm run test

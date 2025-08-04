@@ -9,8 +9,9 @@
     "build:pre": "ncc build src/pre.js -o dist/pre",
     "build:post": "ncc build src/post.js -o dist/post",
     "build:index": "ncc build src/main.js -o dist",
-    "test": "npm run test:standalone",
-    "test:standalone": "node test/test-standalone.js"
+    "test": "npm run test:standalone && npm run test:main-action",
+    "test:standalone": "node test/test-standalone.js",
+    "test:main-action": "node test/test-main-action.js"
   },
   "dependencies": {
     "@actions/artifact": "^2.3.2",
