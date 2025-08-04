@@ -27634,11 +27634,6 @@ async function installMitmproxyCertificate(mitmproxyDir) {
       core.warning(`Certificate installation not supported on platform: ${platform}`);
     }
 
-    // Also set environment variable for applications that respect it
-    core.exportVariable('REQUESTS_CA_BUNDLE', certPath);
-    core.exportVariable('SSL_CERT_FILE', certPath);
-    core.info('Set CA certificate environment variables');
-
     return certPath;
   } catch (error) {
     core.warning(`Certificate installation failed: ${error.message}`);
