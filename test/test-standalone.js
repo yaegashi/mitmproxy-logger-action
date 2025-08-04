@@ -5,8 +5,9 @@
  * This test verifies that each bundle can be loaded independently
  * without requiring external dependencies to be installed.
  * 
- * The test only verifies that require() calls complete successfully
- * without actually executing the action logic to avoid side effects.
+ * The test uses a special bundle test mode that exits after all
+ * require() statements complete successfully, avoiding execution
+ * of the main action logic.
  */
 
 const fs = require('fs');
@@ -47,67 +48,34 @@ for (const bundle of bundles) {
     const tempBundlePath = path.join(tempDir, path.basename(bundle));
     fs.copyFileSync(bundlePath, tempBundlePath);
     
-    // Create a test script that requires the bundle but exits quickly
-    const testScript = `
-      let moduleError = null;
-      
-      try {
-        // Only require the module to test dependencies are bundled
-        require('${tempBundlePath}');
-        
-      } catch (error) {
-        if (error.code === 'MODULE_NOT_FOUND' || error.message.includes('Cannot find module')) {
-          console.error('MODULE_ERROR: ' + error.message);
-          process.exit(1);
-        }
-        // Store other errors but don't exit - they might be expected
-        moduleError = error;
-      }
-      
-      // Set a timer to exit after a short time to prevent long-running actions
-      setTimeout(() => {
-        console.log('REQUIRE_SUCCESS');
-        process.exit(0);
-      }, 500);
-    `;
-    
-    const testScriptPath = path.join(tempDir, 'test.js');
-    fs.writeFileSync(testScriptPath, testScript);
-    
-    // Run the test from the temp directory with timeout
-    const result = execSync(`cd "${tempDir}" && timeout 5 node test.js 2>&1 || echo "TIMEOUT_EXIT"`, { 
+    // Run the bundle in bundle test mode
+    const result = execSync(`cd "${tempDir}" && node "${tempBundlePath}" --bundle-test`, { 
       encoding: 'utf8',
-      timeout: 8000,
+      timeout: 10000,
       stdio: 'pipe'
     });
     
-    if (result.includes('REQUIRE_SUCCESS')) {
+    if (result.includes('Bundle test mode: all requires completed successfully')) {
       console.log(`✅ PASS: ${bundle} loads without module dependency errors`);
-    } else if (result.includes('MODULE_ERROR')) {
-      console.error(`❌ FAIL: ${bundle} has missing dependencies`);
-      console.error(`   Error: ${result.match(/MODULE_ERROR: (.*)/)?.[1] || 'Unknown module error'}`);
-      allPassed = false;
-    } else if (result.includes('Cannot find module')) {
-      console.error(`❌ FAIL: ${bundle} has missing dependencies`);
-      console.error(`   Error: ${result.split('\n')[0]}`);
-      allPassed = false;
     } else {
-      // Timeout or other execution - this is OK as long as no module errors
-      console.log(`✅ PASS: ${bundle} loads without module dependency errors`);
+      console.error(`❌ FAIL: ${bundle} did not complete bundle test properly`);
+      console.error(`   Output: ${result.trim()}`);
+      allPassed = false;
     }
     
   } catch (error) {
     // Check if the error indicates missing modules
     const errorOutput = error.stdout + error.stderr;
-    if (errorOutput.includes('MODULE_ERROR') || 
-        errorOutput.includes('Cannot find module') ||
+    if (errorOutput.includes('Cannot find module') ||
         errorOutput.includes('MODULE_NOT_FOUND')) {
       console.error(`❌ FAIL: ${bundle} has missing dependencies`);
       console.error(`   Error: ${errorOutput.split('\n')[0]}`);
       allPassed = false;
     } else {
-      // Timeout or other execution error - this is expected for action scripts
-      console.log(`✅ PASS: ${bundle} loads without module dependency errors`);
+      console.error(`❌ FAIL: ${bundle} failed to execute in bundle test mode`);
+      console.error(`   Error: ${error.message}`);
+      console.error(`   Output: ${errorOutput.trim()}`);
+      allPassed = false;
     }
   }
 }

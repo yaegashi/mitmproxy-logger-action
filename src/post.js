@@ -7,6 +7,12 @@ const os = require('os');
 const archiver = require('archiver');
 const archiverZipEncrypted = require('archiver-zip-encrypted');
 
+// Bundle test mode detection - exit after requires if in test mode
+if (process.argv.includes('--bundle-test') || process.env.BUNDLE_TEST === '1') {
+  console.log('Bundle test mode: all requires completed successfully');
+  process.exit(0);
+}
+
 // Register the zip-encrypted format with archiver (one-time registration)
 archiver.registerFormat('zip-encrypted', archiverZipEncrypted);
 
