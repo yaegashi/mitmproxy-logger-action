@@ -50,7 +50,7 @@ The `install-certificate` feature provides automatic CA certificate installation
 #### Environment Variables
 
 Additionally sets environment variables for applications:
-- `CURL_HOME`: Configuration for curl SSL handling
+- `CURL_HOME`: Specifies the location of `.curlrc` for setting `ssl-no-revoke`
 
 ### 3. Stream Capture
 
