@@ -50,8 +50,7 @@ The `install-certificate` feature provides automatic CA certificate installation
 #### Environment Variables
 
 Additionally sets environment variables for applications:
-- `REQUESTS_CA_BUNDLE`: Path to CA certificate (Python requests library)
-- `SSL_CERT_FILE`: Path to CA certificate (curl, OpenSSL applications)
+- `CURL_HOME`: Specifies the location of `.curlrc` for setting `ssl-no-revoke` (Windows only)
 
 ### 3. Stream Capture
 

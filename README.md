@@ -47,8 +47,8 @@ jobs:
         run: |
           # With set-envvars: true (default), proxy environment variables are automatically set
           # Alternatively, you can configure your application manually:
-          # export HTTP_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
-          # export HTTPS_PROXY=${{ steps.mitmproxy.outputs.proxy-url }}
+          # export http_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
+          # export https_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
           
           # Run your tests
           npm test
@@ -92,8 +92,8 @@ jobs:
         run: |
           # With set-envvars: true (default), proxy environment variables are automatically set
           # Alternatively, you can configure your application manually:
-          # $env:HTTP_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
-          # $env:HTTPS_PROXY = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # $env:http_proxy = "${{ steps.mitmproxy.outputs.proxy-url }}"
+          # $env:https_proxy = "${{ steps.mitmproxy.outputs.proxy-url }}"
           
           # Run your tests
           npm test
@@ -142,11 +142,7 @@ The action automatically installs mitmproxy's CA certificate to the system trust
 When `set-envvars` is set to `true` (default), the action automatically sets these proxy environment variables:
 - `http_proxy`: Set to the proxy URL (e.g., `http://127.0.0.1:8080`)  
 - `https_proxy`: Set to the proxy URL (e.g., `http://127.0.0.1:8080`)
-- `CURL_OPTIONS`: Set to `--ssl-no-revoke` for better SSL handling
-
-The action also sets these environment variables for applications that use them:
-- `REQUESTS_CA_BUNDLE`: For Python requests library
-- `SSL_CERT_FILE`: For curl and OpenSSL-based applications
+- `CURL_HOME`: Specifies the location of `.curlrc` for setting `ssl-no-revoke` (Windows only)
 
 ### Disabling Environment Variables
 
@@ -242,12 +238,12 @@ mitmweb -r stream_*.mitm
 
 1. **Proxy connection failed**
    - Ensure the specified port is not already in use
-   - Check if your application supports HTTP_PROXY/HTTPS_PROXY environment variables
+   - Check if your application supports http_proxy/https_proxy environment variables
    - Verify the proxy is running with `curl -x http://127.0.0.1:8080 http://httpbin.org/get`
 
 2. **No traffic captured**
    - Make sure your application is configured to use the proxy
-   - Check that HTTP_PROXY and HTTPS_PROXY environment variables are set
+   - Check that http_proxy and https_proxy environment variables are set
    - Some applications may need additional proxy configuration
 
 3. **Certificate errors (HTTPS)**

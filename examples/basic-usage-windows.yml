@@ -21,7 +21,7 @@ jobs:
       # Start mitmproxy logging
       - name: Start mitmproxy
         id: mitmproxy
-        uses: yaegashi/mitmproxy-logger-action@v1
+        uses: yaegashi/mitmproxy-logger-action@main
         with:
           enabled: true
           listen-host: '127.0.0.1'
@@ -29,38 +29,64 @@ jobs:
           install-cacert: true
           set-envvars: true
           passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
-      
-      # Configure your application to use the proxy
-      - name: Run tests with proxy
-        shell: powershell
-        run: |
-          # With set-envvars: true (explicitly enabled), environment variables are automatically set
-          # Note: set-envvars defaults to false, so you need to explicitly set it to true
-          # You can still override them if needed:
-          # $env:http_proxy = "${{ steps.mitmproxy.outputs.proxy-url }}"
-          # $env:https_proxy = "${{ steps.mitmproxy.outputs.proxy-url }}"
-          # Note: CURL_HOME and .curlrc are automatically configured for Windows
-          
-          # Example: test HTTP requests using PowerShell
-          Invoke-WebRequest -Uri "http://httpbin.org/get" -UseBasicParsing
-          Invoke-WebRequest -Uri "https://httpbin.org/get" -UseBasicParsing
-          
-          # Your actual test commands would go here
-          # npm test
-          # python -m pytest
-          # etc.
-      
-      # Alternative using curl on Windows (if available)
-      - name: Test with curl (if available)
+
+      # Test HTTP requests using curl (libcurl) - most common method
+      - name: Test with curl (libcurl)
+        id: curl
         shell: cmd
         run: |
-          REM Environment variables are already set by the action
-          REM You can still set them manually if needed:
-          REM set http_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
-          REM set https_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
-          REM Note: CURL_HOME and .curlrc are automatically configured for Windows
-          curl http://httpbin.org/get
-          curl https://httpbin.org/get
+          REM With set-envvars: true, proxy environment variables are automatically set
+          REM The -v flag provides verbose output to show the proxy connection
+          curl -v "http://httpbin.org/get?id=curl"
+          curl -v "https://httpbin.org/get?id=curl"
         continue-on-error: true
+
+      # Test using Windows HTTP stack with bitsadmin
+      - name: Test with bitsadmin (WinHttp)
+        id: bitsadmin
+        shell: powershell
+        run: |
+          try {
+            # Configure Windows HTTP proxy settings for WinHttp stack
+            netsh winhttp set proxy ${{ steps.mitmproxy.outputs.proxy-url }}
+            # Use bitsadmin to test HTTP requests through the proxy
+            & bitsadmin /transfer http "http://httpbin.org/get?id=bitsadmin" (Join-Path $env:TEMP http.txt)
+            & bitsadmin /transfer https "https://httpbin.org/get?id=bitsadmin" (Join-Path $env:TEMP https.txt)
+          } finally {
+            # Reset Windows HTTP proxy settings
+            netsh winhttp reset proxy
+          }
+        continue-on-error: true
+
+      # Test using Windows PowerShell (.NET HttpWebRequest)
+      - name: Test with Windows PowerShell (.NET HttpWebRequest)
+        id: powershell
+        shell: powershell
+        run: |
+          # Configure .NET proxy settings programmatically
+          $proxy = '${{ steps.mitmproxy.outputs.proxy-url }}'
+          [System.Net.WebRequest]::DefaultWebProxy = New-Object System.Net.WebProxy($proxy, $true)
+          # Test HTTP requests using PowerShell's Invoke-WebRequest
+          Invoke-WebRequest -Uri "http://httpbin.org/get?id=powershell" -UseBasicParsing
+          Invoke-WebRequest -Uri "https://httpbin.org/get?id=powershell" -UseBasicParsing
+        continue-on-error: true
+
+      # Test using PowerShell Core (.NET HttpClient)
+      - name: Test with PowerShell Core (.NET HttpClient)
+        id: pwsh
+        shell: pwsh
+        run: |
+          # PowerShell Core automatically uses proxy environment variables
+          # Test HTTP requests using PowerShell Core's Invoke-WebRequest
+          Invoke-WebRequest -Uri "http://httpbin.org/get?id=pwsh"
+          Invoke-WebRequest -Uri "https://httpbin.org/get?id=pwsh"
+        continue-on-error: true
+      
+      # Your actual test commands would go here
+      # - name: Run your application tests
+      #   run: |
+      #     npm test
+      #     python -m pytest
+      #     etc.
       
       # mitmproxy will automatically stop and upload artifacts when the job completes
