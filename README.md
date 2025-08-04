@@ -142,7 +142,7 @@ The action automatically installs mitmproxy's CA certificate to the system trust
 When `set-envvars` is set to `true` (default), the action automatically sets these proxy environment variables:
 - `http_proxy`: Set to the proxy URL (e.g., `http://127.0.0.1:8080`)  
 - `https_proxy`: Set to the proxy URL (e.g., `http://127.0.0.1:8080`)
-- `CURL_HOME`: Specifies the location of `.curlrc` for setting `ssl-no-revoke`
+- `CURL_HOME`: Specifies the location of `.curlrc` for setting `ssl-no-revoke` (Windows only)
 
 ### Disabling Environment Variables
 
