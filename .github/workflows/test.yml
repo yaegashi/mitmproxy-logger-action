@@ -18,6 +18,11 @@ jobs:
           npm install
           npm run build
       
+      - name: Test standalone bundle execution
+        run: |
+          # Test that bundles are truly standalone and don't require external dependencies
+          npm run test:standalone
+      
       - name: Test bundled files exist and execute
         run: |
           # Test that bundled files exist
