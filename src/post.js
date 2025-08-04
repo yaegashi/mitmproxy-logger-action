@@ -7,6 +7,9 @@ const os = require('os');
 const archiver = require('archiver');
 const archiverZipEncrypted = require('archiver-zip-encrypted');
 
+// Register the zip-encrypted format with archiver (one-time registration)
+archiver.registerFormat('zip-encrypted', archiverZipEncrypted);
+
 async function run() {
   try {
     // Unset proxy environment variables first to avoid affecting artifact upload
@@ -204,9 +207,6 @@ async function run() {
     core.info('Creating password-protected ZIP archive...');
     const zipFile = path.join(artifactDir, `${archiveName}.zip`);
     
-    // Register the zip-encrypted format with archiver
-    archiver.registerFormat('zip-encrypted', archiverZipEncrypted);
-    
     await new Promise((resolve, reject) => {
       const output = fs.createWriteStream(zipFile);
       const archive = archiver('zip-encrypted', {
@@ -216,7 +216,9 @@ async function run() {
       
       output.on('close', () => {
         core.info(`Password-protected ZIP archive created: ${zipFile}`);
-        core.info(`Archive size: ${archive.pointer()} bytes`);
+        // Get file size from the output stream stats instead of archive.pointer()
+        const stats = fs.statSync(zipFile);
+        core.info(`Archive size: ${stats.size} bytes`);
         resolve();
       });
       
