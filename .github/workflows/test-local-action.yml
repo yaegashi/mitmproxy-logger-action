@@ -1,6 +1,10 @@
-name: Test Output Fix
+name: Test Local Action
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -10,12 +14,6 @@ jobs:
     steps:
       - name: Checkout this repository
         uses: actions/checkout@v4
-      
-      # Build the action locally for testing
-      - name: Build action
-        run: |
-          npm install
-          npm run build
       
       # Test the action with the fix
       - name: Test mitmproxy action
@@ -92,12 +90,6 @@ jobs:
     steps:
       - name: Checkout this repository
         uses: actions/checkout@v4
-      
-      # Build the action locally for testing
-      - name: Build action
-        run: |
-          npm install
-          npm run build
       
       # Test the action with set-envvars disabled
       - name: Test mitmproxy action with set-envvars=false
