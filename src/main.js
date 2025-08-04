@@ -31,8 +31,18 @@ async function run() {
         
         // For Windows, set CURL_HOME and create .curlrc with ssl-no-revoke
         if (os.platform() === 'win32') {
-          const mitmproxyDir = core.getState('mitmproxy-dir');
+          let mitmproxyDir = core.getState('mitmproxy-dir');
+          
+          // If not available in state, construct the expected path in RUNNER_TEMP
+          if (!mitmproxyDir) {
+            const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
+            mitmproxyDir = path.join(runnerTemp, 'mitmproxy-logger-action');
+          }
+          
           if (mitmproxyDir) {
+            // Ensure directory exists
+            fs.mkdirSync(mitmproxyDir, { recursive: true });
+            
             core.exportVariable('CURL_HOME', mitmproxyDir);
             const curlrcPath = path.join(mitmproxyDir, '.curlrc');
             fs.writeFileSync(curlrcPath, 'ssl-no-revoke\n');
