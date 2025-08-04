@@ -13,14 +13,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-    
+
     steps:
       - name: Checkout this repository
         uses: actions/checkout@v4
-      
-      # Test the action with the fix
-      - name: Test mitmproxy action
-        id: mitmproxy
+
+      # Test the action with envvars enabled
+      - name: Test mitmproxy action with envvars
+        id: mitmproxy-with-envvars
         uses: ./
         with:
           enabled: true
@@ -30,27 +30,27 @@ jobs:
           set-envvars: true
           passphrase: 'test-passphrase-12345'
           artifact-name: 'mitmproxy_stream_artifact_envvars-enabled-${{ matrix.os }}'
-      
-      # Test that outputs are accessible
-      - name: Test outputs
+
+      # Test that outputs are accessible with envvars
+      - name: Test outputs with envvars
         shell: bash
         run: |
           echo "Testing outputs..."
-          echo "proxy-url output: '${{ steps.mitmproxy.outputs.proxy-url }}'"
-          echo "stream-file output: '${{ steps.mitmproxy.outputs.stream-file }}'"
-          echo "cacert-path output: '${{ steps.mitmproxy.outputs.cacert-path }}'"
-          
+          echo "proxy-url output: '${{ steps.mitmproxy-with-envvars.outputs.proxy-url }}'"
+          echo "stream-file output: '${{ steps.mitmproxy-with-envvars.outputs.stream-file }}'"
+          echo "cacert-path output: '${{ steps.mitmproxy-with-envvars.outputs.cacert-path }}'"
+
           # Check if proxy-url is not empty
-          if [ -z "${{ steps.mitmproxy.outputs.proxy-url }}" ]; then
+          if [ -z "${{ steps.mitmproxy-with-envvars.outputs.proxy-url }}" ]; then
             echo "❌ ERROR: proxy-url is empty!"
             exit 1
           else
-            echo "✅ SUCCESS: proxy-url is set to: ${{ steps.mitmproxy.outputs.proxy-url }}"
+            echo "✅ SUCCESS: proxy-url is set to: ${{ steps.mitmproxy-with-envvars.outputs.proxy-url }}"
           fi
-          
+
           # Check if cacert-path output exists (should be set even if empty)
-          echo "✅ SUCCESS: cacert-path output is available: '${{ steps.mitmproxy.outputs.cacert-path }}'"
-          
+          echo "✅ SUCCESS: cacert-path output is available: '${{ steps.mitmproxy-with-envvars.outputs.cacert-path }}'"
+
           # Test that environment variables are set (when set-envvars=true)
           echo "Testing environment variables..."
           if [ -z "$http_proxy" ]; then
@@ -59,14 +59,14 @@ jobs:
           else
             echo "✅ SUCCESS: http_proxy is set to: $http_proxy"
           fi
-          
+
           if [ -z "$https_proxy" ]; then
             echo "❌ ERROR: https_proxy environment variable not set!"
             exit 1
           else
             echo "✅ SUCCESS: https_proxy is set to: $https_proxy"
           fi
-          
+
           # Only check CURL_HOME on Windows runners
           if [ "${{ runner.os }}" = "Windows" ]; then
             if [ -z "$CURL_HOME" ]; then
@@ -74,7 +74,7 @@ jobs:
               exit 1
             else
               echo "✅ SUCCESS: CURL_HOME is set to: $CURL_HOME"
-              
+
               # Check if .curlrc file exists and contains expected content
               curlrc_path="$CURL_HOME/.curlrc"
               if [ -f "$curlrc_path" ]; then
@@ -100,14 +100,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-    
+
     steps:
       - name: Checkout this repository
         uses: actions/checkout@v4
-      
-      # Test the action with set-envvars disabled
-      - name: Test mitmproxy action with set-envvars=false
-        id: mitmproxy-no-envvars
+
+      # Test the action with envvars disabled
+      - name: Test mitmproxy action without envvars
+        id: mitmproxy-without-envvars
         uses: ./
         with:
           enabled: true
@@ -117,22 +117,51 @@ jobs:
           set-envvars: false
           passphrase: 'test-passphrase-12345'
           artifact-name: 'mitmproxy_stream_artifact_envvars-disabled-${{ matrix.os }}'
-      
-      # Test that outputs are accessible but env vars are not set
-      - name: Test outputs without environment variables
+
+      # Test that outputs are accessible without envvars
+      - name: Test outputs without envvars
         shell: bash
         run: |
           echo "Testing outputs when set-envvars=false..."
-          echo "proxy-url output: '${{ steps.mitmproxy-no-envvars.outputs.proxy-url }}'"
-          echo "stream-file output: '${{ steps.mitmproxy-no-envvars.outputs.stream-file }}'"
-          echo "cacert-path output: '${{ steps.mitmproxy-no-envvars.outputs.cacert-path }}'"
-          
+          echo "proxy-url output: '${{ steps.mitmproxy-without-envvars.outputs.proxy-url }}'"
+          echo "stream-file output: '${{ steps.mitmproxy-without-envvars.outputs.stream-file }}'"
+          echo "cacert-path output: '${{ steps.mitmproxy-without-envvars.outputs.cacert-path }}'"
+
           # Check if proxy-url is not empty
-          if [ -z "${{ steps.mitmproxy-no-envvars.outputs.proxy-url }}" ]; then
+          if [ -z "${{ steps.mitmproxy-without-envvars.outputs.proxy-url }}" ]; then
             echo "❌ ERROR: proxy-url is empty!"
             exit 1
           else
-            echo "✅ SUCCESS: proxy-url is set to: ${{ steps.mitmproxy-no-envvars.outputs.proxy-url }}"
+            echo "✅ SUCCESS: proxy-url is set to: ${{ steps.mitmproxy-without-envvars.outputs.proxy-url }}"
           fi
-          
+
           echo "✅ SUCCESS: All outputs are working when set-envvars=false"
+
+          # Test that environment variables are NOT set (when set-envvars=false)
+          echo "Testing that environment variables are NOT set..."
+
+          if [ -n "$http_proxy" ]; then
+            echo "❌ ERROR: http_proxy environment variable should not be set but is: $http_proxy"
+            exit 1
+          else
+            echo "✅ SUCCESS: http_proxy is not set (as expected)"
+          fi
+
+          if [ -n "$https_proxy" ]; then
+            echo "❌ ERROR: https_proxy environment variable should not be set but is: $https_proxy"
+            exit 1
+          else
+            echo "✅ SUCCESS: https_proxy is not set (as expected)"
+          fi
+
+          # Only check CURL_HOME on Windows runners
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            if [ -n "$CURL_HOME" ]; then
+              echo "❌ ERROR: CURL_HOME environment variable should not be set but is: $CURL_HOME"
+              exit 1
+            else
+              echo "✅ SUCCESS: CURL_HOME is not set (as expected)"
+            fi
+          else
+            echo "ℹ️ Skipping CURL_HOME check on non-Windows runner (${{ runner.os }})"
+          fi
