@@ -222,7 +222,7 @@ async function run() {
       
       output.on('close', () => {
         core.info(`Password-protected ZIP archive created: ${zipFile}`);
-        // Get file size from the output stream stats instead of archive.pointer()
+        // Use fs.statSync to get the actual file size on disk, as archive.pointer() may not account for encryption overhead or final ZIP structure.
         const stats = fs.statSync(zipFile);
         core.info(`Archive size: ${stats.size} bytes`);
         resolve();

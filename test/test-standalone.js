@@ -49,23 +49,29 @@ for (const bundle of bundles) {
     fs.copyFileSync(bundlePath, tempBundlePath);
     
     // Run the bundle in bundle test mode
-    const result = execSync(`cd "${tempDir}" && node "${tempBundlePath}" --bundle-test`, { 
-      encoding: 'utf8',
-      timeout: 10000,
-      stdio: 'pipe'
-    });
+    const spawnResult = spawnSync(
+      process.execPath,
+      [path.basename(bundle), '--bundle-test'],
+      {
+        cwd: tempDir,
+        encoding: 'utf8',
+        timeout: 10000,
+        stdio: 'pipe'
+      }
+    );
     
-    if (result.includes('Bundle test mode: all requires completed successfully')) {
+    const output = (spawnResult.stdout || '') + (spawnResult.stderr || '');
+    if (output.includes('Bundle test mode: all requires completed successfully')) {
       console.log(`✅ PASS: ${bundle} loads without module dependency errors`);
     } else {
       console.error(`❌ FAIL: ${bundle} did not complete bundle test properly`);
-      console.error(`   Output: ${result.trim()}`);
+      console.error(`   Output: ${output.trim()}`);
       allPassed = false;
     }
     
   } catch (error) {
     // Check if the error indicates missing modules
-    const errorOutput = error.stdout + error.stderr;
+    const errorOutput = (error.stdout || '') + (error.stderr || '');
     if (errorOutput.includes('Cannot find module') ||
         errorOutput.includes('MODULE_NOT_FOUND')) {
       console.error(`❌ FAIL: ${bundle} has missing dependencies`);
