@@ -29,7 +29,7 @@ jobs:
           install-cacert: true
           set-envvars: true
           passphrase: 'test-passphrase-12345'
-          artifact-name-suffix: 'envvars-enabled-${{ matrix.os }}'
+          artifact-name: 'mitmproxy_stream_artifact_envvars-enabled-${{ matrix.os }}'
       
       # Test that outputs are accessible
       - name: Test outputs
@@ -116,7 +116,7 @@ jobs:
           install-cacert: false
           set-envvars: false
           passphrase: 'test-passphrase-12345'
-          artifact-name-suffix: 'envvars-disabled-${{ matrix.os }}'
+          artifact-name: 'mitmproxy_stream_artifact_envvars-disabled-${{ matrix.os }}'
       
       # Test that outputs are accessible but env vars are not set
       - name: Test outputs without environment variables

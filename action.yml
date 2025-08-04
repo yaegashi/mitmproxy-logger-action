@@ -26,8 +26,8 @@ inputs:
   passphrase:
     description: 'Passphrase for artifact encryption'
     required: true
-  artifact-name-suffix:
-    description: 'Suffix to append to artifact name for uniqueness (optional)'
+  artifact-name:
+    description: 'Custom artifact name (optional, defaults to auto-generated name)'
     required: false
     default: ''
 
