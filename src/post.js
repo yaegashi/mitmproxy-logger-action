@@ -131,7 +131,11 @@ async function run() {
     const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
     const runNumber = process.env.GITHUB_RUN_NUMBER || 'unknown';
     const archiveName = `mitmproxy_stream_${timestamp}`;
-    const artifactName = `mitmproxy_stream_artifact_${runNumber}`;
+    
+    // Get artifact name suffix for uniqueness (useful for matrix builds)
+    const artifactNameSuffix = core.getInput('artifact-name-suffix') || '';
+    const baseName = `mitmproxy_stream_artifact_${runNumber}`;
+    const artifactName = artifactNameSuffix ? `${baseName}_${artifactNameSuffix}` : baseName;
     
     // Find the stream file - use state only (no file system search)
     let actualStreamFile = streamFile;

@@ -26,6 +26,10 @@ inputs:
   passphrase:
     description: 'Passphrase for artifact encryption'
     required: true
+  artifact-name-suffix:
+    description: 'Suffix to append to artifact name for uniqueness (optional)'
+    required: false
+    default: ''
 
 outputs:
   proxy-url:
