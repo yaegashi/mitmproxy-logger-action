@@ -15,7 +15,7 @@ jobs:
       # Start mitmproxy logging
       - name: Start mitmproxy
         id: mitmproxy
-        uses: yaegashi/mitmproxy-logger-action@v1
+        uses: yaegashi/mitmproxy-logger-action@main
         with:
           enabled: true
           listen-host: '127.0.0.1'
@@ -24,18 +24,14 @@ jobs:
           set-envvars: true
           passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
       
-      # Configure your application to use the proxy
-      - name: Run tests with proxy
+      # Test HTTP requests with proxy - verbose output to see proxy in action
+      - name: Test HTTP requests
+        id: test-http
         run: |
-          # With set-envvars: true (explicitly enabled), environment variables are automatically set
-          # Note: set-envvars defaults to false, so you need to explicitly set it to true
-          # You can still override them if needed:
-          # export http_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
-          # export https_proxy=${{ steps.mitmproxy.outputs.proxy-url }}
-          
-          # Example: test HTTP requests
-          curl http://httpbin.org/get
-          curl https://httpbin.org/get
+          # With set-envvars: true, proxy environment variables are automatically set
+          # The -v flag provides verbose output to show the proxy connection
+          curl -v "http://httpbin.org/get?id=test-http"
+          curl -v "https://httpbin.org/get?id=test-http"
           
           # Your actual test commands would go here
           # npm test
