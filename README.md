@@ -172,25 +172,25 @@ To disable automatic certificate installation:
 
 ### Ubuntu/macOS
 - Full support for all features
-- Password-protected ZIP encryption using yazl library
+- Password-protected ZIP encryption using AES-256 encryption
 - Compression using ZIP format
 
 ### Windows
 - Full support for all features  
 - **Note:** Requires Python to be available (use `actions/setup-python@v4`)
-- Password-protected ZIP encryption using yazl library
+- Password-protected ZIP encryption using AES-256 encryption
 - Compression using ZIP format
 - See `examples/basic-usage-windows.yml` for a complete Windows example
 
 ## Security Notes
 
 - The `passphrase` input should be stored as a GitHub secret
-- Traffic files are encrypted using password-protected ZIP format before upload
+- Traffic files are encrypted using AES-256 password-protected ZIP format before upload
 - Temporary files are cleaned up after artifact creation
 - The proxy only listens on localhost by default
 
 ### Windows Security Notes
-- Full encryption support using password-protected ZIP format
+- Full encryption support using AES-256 password-protected ZIP format
 - No additional dependencies required for encryption
 
 ## Decrypting Traffic Files

@@ -4,7 +4,17 @@ const artifact = require('@actions/artifact');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const yazl = require('yazl');
+const archiver = require('archiver');
+const archiverZipEncrypted = require('archiver-zip-encrypted');
+
+// Bundle test mode detection - exit after requires if in test mode
+if (process.argv.includes('--bundle-test') || process.env.BUNDLE_TEST === '1') {
+  console.log('Bundle test mode: all requires completed successfully');
+  process.exit(0);
+}
+
+// Register the zip-encrypted format with archiver (one-time registration)
+archiver.registerFormat('zip-encrypted', archiverZipEncrypted);
 
 async function run() {
   try {
@@ -204,41 +214,45 @@ async function run() {
     const zipFile = path.join(artifactDir, `${archiveName}.zip`);
     
     await new Promise((resolve, reject) => {
-      const zipArchive = new yazl.ZipFile();
+      const output = fs.createWriteStream(zipFile);
+      const archive = archiver('zip-encrypted', {
+        encryptionMethod: 'aes256',
+        password: passphrase
+      });
+      
+      output.on('close', () => {
+        core.info(`Password-protected ZIP archive created: ${zipFile}`);
+        // Use fs.statSync to get the actual file size on disk, as archive.pointer() may not account for encryption overhead or final ZIP structure.
+        const stats = fs.statSync(zipFile);
+        core.info(`Archive size: ${stats.size} bytes`);
+        resolve();
+      });
+      
+      output.on('error', reject);
+      archive.on('error', reject);
+      
+      archive.pipe(output);
       
       // Add .mitm file with encryption
       if (actualStreamFile && fs.existsSync(actualStreamFile)) {
-        zipArchive.addFile(actualStreamFile, path.basename(actualStreamFile), {
-          password: passphrase
-        });
+        archive.file(actualStreamFile, { name: path.basename(actualStreamFile) });
         core.info(`Added encrypted to ZIP: ${path.basename(actualStreamFile)}`);
       }
       
       // Add .har file with encryption
       if (harFile && fs.existsSync(harFile)) {
-        zipArchive.addFile(harFile, path.basename(harFile), {
-          password: passphrase
-        });
+        archive.file(harFile, { name: path.basename(harFile) });
         core.info(`Added encrypted to ZIP: ${path.basename(harFile)}`);
       }
       
       // Add logs if available with encryption
       const logFile = path.join(mitmproxyDir, 'mitmdump.log');
       if (fs.existsSync(logFile)) {
-        zipArchive.addFile(logFile, 'mitmdump.log', {
-          password: passphrase
-        });
+        archive.file(logFile, { name: 'mitmdump.log' });
         core.info('Added encrypted mitmdump log file to ZIP');
       }
       
-      zipArchive.end();
-      
-      zipArchive.outputStream.pipe(fs.createWriteStream(zipFile))
-        .on('close', () => {
-          core.info(`Password-protected ZIP archive created: ${zipFile}`);
-          resolve();
-        })
-        .on('error', reject);
+      archive.finalize();
     });
 
     const finalFile = zipFile;

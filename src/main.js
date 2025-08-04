@@ -3,6 +3,12 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
+// Bundle test mode detection - exit after requires if in test mode
+if (process.argv.includes('--bundle-test') || process.env.BUNDLE_TEST === '1') {
+  console.log('Bundle test mode: all requires completed successfully');
+  process.exit(0);
+}
+
 async function run() {
   try {
     // Main action - read state from pre action and set outputs

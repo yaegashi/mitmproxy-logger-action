@@ -27560,6 +27560,13 @@ const exec = __nccwpck_require__(5236);
 const path = __nccwpck_require__(6928);
 const fs = __nccwpck_require__(9896);
 const os = __nccwpck_require__(857);
+const { spawn } = __nccwpck_require__(5317);
+
+// Bundle test mode detection - exit after requires if in test mode
+if (process.argv.includes('--bundle-test') || process.env.BUNDLE_TEST === '1') {
+  console.log('Bundle test mode: all requires completed successfully');
+  process.exit(0);
+}
 
 async function waitForCACertificate(certPath, maxAttempts = 10, delayMs = 1000) {
   let attempts = 0;
@@ -27699,7 +27706,6 @@ async function run() {
     const logFd = fs.openSync(logFile, 'a');
 
     // Spawn mitmdump process
-    const { spawn } = __nccwpck_require__(5317);
     const mitmdumpProcess = spawn('mitmdump', mitmdumpArgs, {
       detached: true,
       stdio: ['ignore', logFd, logFd]
