@@ -8,8 +8,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-outputs:
-    runs-on: ubuntu-latest
+  test-set-envvars-enabled:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     
     steps:
       - name: Checkout this repository
@@ -29,6 +32,7 @@ jobs:
       
       # Test that outputs are accessible
       - name: Test outputs
+        shell: bash
         run: |
           echo "Testing outputs..."
           echo "proxy-url output: '${{ steps.mitmproxy.outputs.proxy-url }}'"
@@ -62,30 +66,39 @@ jobs:
             echo "✅ SUCCESS: https_proxy is set to: $https_proxy"
           fi
           
-          # Only check CURL_OPTIONS on Windows runners
+          # Only check CURL_HOME on Windows runners
           if [ "${{ runner.os }}" = "Windows" ]; then
-            if [ -z "$CURL_OPTIONS" ]; then
-              echo "❌ ERROR: CURL_OPTIONS environment variable not set!"
+            if [ -z "$CURL_HOME" ]; then
+              echo "❌ ERROR: CURL_HOME environment variable not set!"
               exit 1
             else
-              echo "✅ SUCCESS: CURL_OPTIONS is set to: $CURL_OPTIONS"
+              echo "✅ SUCCESS: CURL_HOME is set to: $CURL_HOME"
+              
+              # Check if .curlrc file exists and contains expected content
+              curlrc_path="$CURL_HOME/.curlrc"
+              if [ -f "$curlrc_path" ]; then
+                curlrc_content=$(cat "$curlrc_path")
+                if echo "$curlrc_content" | grep -q "ssl-no-revoke"; then
+                  echo "✅ SUCCESS: .curlrc file contains ssl-no-revoke"
+                else
+                  echo "❌ ERROR: .curlrc file does not contain ssl-no-revoke"
+                  echo "Content: $curlrc_content"
+                  exit 1
+                fi
+              else
+                echo "❌ ERROR: .curlrc file not found at $curlrc_path"
+                exit 1
+              fi
             fi
           else
-            echo "ℹ️ Skipping CURL_OPTIONS check on non-Windows runner (${{ runner.os }})"
+            echo "ℹ️ Skipping CURL_HOME check on non-Windows runner (${{ runner.os }})"
           fi
-          
-          # Test that we can use the proxy URL
-          export HTTP_PROXY="${{ steps.mitmproxy.outputs.proxy-url }}"
-          export HTTPS_PROXY="${{ steps.mitmproxy.outputs.proxy-url }}"
-          echo "HTTP_PROXY=$HTTP_PROXY"
-          echo "HTTPS_PROXY=$HTTPS_PROXY"
-          
-          # Make a test request through the proxy
-          echo "Testing HTTP request through proxy..."
-          curl -x "${{ steps.mitmproxy.outputs.proxy-url }}" --connect-timeout 10 http://httpbin.org/get || echo "Request failed (expected if mitmdump isn't fully ready)"
 
   test-set-envvars-disabled:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     
     steps:
       - name: Checkout this repository
@@ -105,6 +118,7 @@ jobs:
       
       # Test that outputs are accessible but env vars are not set
       - name: Test outputs without environment variables
+        shell: bash
         run: |
           echo "Testing outputs when set-envvars=false..."
           echo "proxy-url output: '${{ steps.mitmproxy-no-envvars.outputs.proxy-url }}'"
