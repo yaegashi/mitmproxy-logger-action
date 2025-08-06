@@ -6,15 +6,17 @@ A GitHub Action that automatically captures HTTP/HTTPS traffic using mitmproxy d
 
 ## Features
 
-- Starts mitmdump proxy on specified host/port
+- Starts mitmdump proxy on specified host/port using **standalone mitmproxy binaries**
 - Logs all HTTP/HTTPS traffic to a file
 - **Automatic CA certificate installation** for seamless HTTPS interception
+- **Automatic download of latest mitmproxy standalone version** - no Python dependencies required
 - Compresses and encrypts traffic logs with a passphrase
 - Uploads traffic data as GitHub Actions artifacts
 - Configurable proxy settings
 - Easy cleanup and artifact management
 - **Cross-platform support** (Ubuntu, macOS, Windows)
 - **Pure Node.js implementation** (no bash scripts required)
+- **No runner environment dependencies** - uses self-contained mitmproxy binaries
 
 ## Usage
 
@@ -68,11 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # Setup Python (required for mitmproxy)
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
+      # mitmproxy standalone version is automatically downloaded - no Python setup required!
       
       # Start mitmproxy logging
       - name: Start mitmproxy
@@ -172,12 +170,13 @@ To disable automatic certificate installation:
 
 ### Ubuntu/macOS
 - Full support for all features
+- **Automatic download of mitmproxy standalone binaries** - no package manager dependencies
 - Password-protected ZIP encryption using AES-256 encryption
 - Compression using ZIP format
 
 ### Windows
 - Full support for all features  
-- **Note:** Requires Python to be available (use `actions/setup-python@v4`)
+- **No Python setup required** - uses standalone mitmproxy binaries
 - Password-protected ZIP encryption using AES-256 encryption
 - Compression using ZIP format
 - See `examples/basic-usage-windows.yml` for a complete Windows example
@@ -285,7 +284,7 @@ npm install
 # Build the action
 npm run build
 
-# Start mitmproxy (pre action)
+# Start mitmproxy (pre action) - will download standalone mitmproxy
 node dist/pre/index.js
 
 # Test proxy
@@ -311,7 +310,7 @@ npm install
 # Build the action
 npm run build
 
-# Start mitmproxy (pre action)
+# Start mitmproxy (pre action) - will download standalone mitmproxy
 node dist/pre/index.js
 
 # Test proxy

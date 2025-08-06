@@ -91,6 +91,161 @@ async function installMitmproxyCertificate(mitmproxyDir) {
   }
 }
 
+async function downloadStandaloneMitmproxy() {
+  const platform = os.platform();
+  const arch = os.arch();
+  
+  core.info(`Detected platform: ${platform}, architecture: ${arch}`);
+  
+  // Create directory in RUNNER_TEMP for mitmproxy standalone
+  const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
+  const mitmproxyStandaloneDir = path.join(runnerTemp, 'mitmproxy-standalone');
+  fs.mkdirSync(mitmproxyStandaloneDir, { recursive: true });
+  
+  let downloadUrl;
+  let fileName;
+  let executableName = 'mitmdump';
+  
+  // Try to get the latest version first, fallback to known stable version
+  let version = '10.4.2'; // Fallback version
+  try {
+    core.info('Attempting to get latest mitmproxy version...');
+    let latestVersionOutput = '';
+    await exec.exec('curl', ['-s', 'https://api.github.com/repos/mitmproxy/mitmproxy/releases/latest'], {
+      listeners: {
+        stdout: (data) => {
+          latestVersionOutput += data.toString();
+        }
+      },
+      ignoreReturnCode: true
+    });
+    
+    if (latestVersionOutput) {
+      const releaseData = JSON.parse(latestVersionOutput);
+      if (releaseData.tag_name) {
+        version = releaseData.tag_name.replace('v', '');
+        core.info(`Found latest version: ${version}`);
+      }
+    }
+  } catch (error) {
+    core.info(`Could not fetch latest version, using fallback: ${version}`);
+  }
+  
+  // Determine download URL based on platform
+  if (platform === 'linux') {
+    if (arch === 'x64') {
+      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-linux-x86_64.tar.gz`;
+      fileName = `mitmproxy-${version}-linux-x86_64.tar.gz`;
+    } else {
+      throw new Error(`Unsupported Linux architecture: ${arch}`);
+    }
+  } else if (platform === 'darwin') {
+    downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-macos-x86_64.tar.gz`;
+    fileName = `mitmproxy-${version}-macos-x86_64.tar.gz`;
+  } else if (platform === 'win32') {
+    downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-windows-x86_64.zip`;
+    fileName = `mitmproxy-${version}-windows-x86_64.zip`;
+    executableName = 'mitmdump.exe';
+  } else {
+    throw new Error(`Unsupported platform: ${platform}`);
+  }
+  
+  const downloadPath = path.join(mitmproxyStandaloneDir, fileName);
+  
+  core.info(`Downloading mitmproxy ${version} standalone from: ${downloadUrl}`);
+  
+  // Download using curl with retry
+  try {
+    await exec.exec('curl', ['-L', '-o', downloadPath, downloadUrl, '--fail', '--retry', '3']);
+  } catch (error) {
+    core.warning(`Failed to download from snapshots URL, trying GitHub releases...`);
+    // Fallback to GitHub releases
+    const githubUrl = `https://github.com/mitmproxy/mitmproxy/releases/download/v${version}/${fileName}`;
+    core.info(`Trying GitHub releases URL: ${githubUrl}`);
+    await exec.exec('curl', ['-L', '-o', downloadPath, githubUrl, '--fail', '--retry', '3']);
+  }
+  
+  core.info(`Downloaded to: ${downloadPath}`);
+  
+  // Verify download
+  const stats = fs.statSync(downloadPath);
+  core.info(`Download size: ${stats.size} bytes`);
+  if (stats.size < 1024) {
+    throw new Error('Downloaded file is too small, likely an error page');
+  }
+  
+  // Extract based on file type
+  if (fileName.endsWith('.tar.gz')) {
+    await exec.exec('tar', ['-xzf', downloadPath, '-C', mitmproxyStandaloneDir]);
+  } else if (fileName.endsWith('.zip')) {
+    // On Windows, use PowerShell to extract ZIP
+    if (platform === 'win32') {
+      await exec.exec('powershell', [
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+        `Expand-Archive -Path '${downloadPath}' -DestinationPath '${mitmproxyStandaloneDir}' -Force`
+      ]);
+    } else {
+      await exec.exec('unzip', ['-o', downloadPath, '-d', mitmproxyStandaloneDir]);
+    }
+  }
+  
+  // Find the mitmdump executable
+  const extractedFiles = fs.readdirSync(mitmproxyStandaloneDir);
+  let mitmdumpPath = null;
+  
+  // Look for mitmdump directly or in subdirectories
+  for (const item of extractedFiles) {
+    const itemPath = path.join(mitmproxyStandaloneDir, item);
+    if (fs.statSync(itemPath).isDirectory()) {
+      const subFiles = fs.readdirSync(itemPath);
+      if (subFiles.includes(executableName)) {
+        mitmdumpPath = path.join(itemPath, executableName);
+        break;
+      }
+    } else if (item === executableName) {
+      mitmdumpPath = itemPath;
+      break;
+    }
+  }
+  
+  if (!mitmdumpPath) {
+    // Try a more extensive search
+    core.info('Primary search failed, doing recursive search...');
+    const findRecursive = (dir, targetName) => {
+      const items = fs.readdirSync(dir);
+      for (const item of items) {
+        const fullPath = path.join(dir, item);
+        if (fs.statSync(fullPath).isDirectory()) {
+          const result = findRecursive(fullPath, targetName);
+          if (result) return result;
+        } else if (item === targetName) {
+          return fullPath;
+        }
+      }
+      return null;
+    };
+    
+    mitmdumpPath = findRecursive(mitmproxyStandaloneDir, executableName);
+  }
+  
+  if (!mitmdumpPath) {
+    core.info(`Available files: ${JSON.stringify(extractedFiles, null, 2)}`);
+    throw new Error(`Could not find ${executableName} in extracted files`);
+  }
+  
+  // Make executable on Unix systems
+  if (platform !== 'win32') {
+    await exec.exec('chmod', ['+x', mitmdumpPath]);
+  }
+  
+  core.info(`mitmproxy standalone installed at: ${mitmdumpPath}`);
+  
+  // Verify installation
+  await exec.exec(mitmdumpPath, ['--version']);
+  
+  return mitmdumpPath;
+}
+
 async function run() {
   try {
     // This is the pre action - install and start mitmproxy
@@ -111,13 +266,14 @@ async function run() {
 
     core.info('Starting mitmproxy logger...');
 
-    // Install mitmproxy if not already installed
+    // Download and install standalone mitmproxy
+    let mitmdumpPath;
     try {
-      await exec.exec('mitmdump', ['--version'], { silent: true });
-      core.info('mitmproxy is already installed');
+      core.info('Installing mitmproxy standalone version...');
+      mitmdumpPath = await downloadStandaloneMitmproxy();
     } catch (error) {
-      core.info('Installing mitmproxy...');
-      await exec.exec('pip', ['install', '--upgrade', 'mitmproxy']);
+      core.setFailed(`Failed to install mitmproxy standalone: ${error.message}`);
+      return;
     }
 
     // Create directory in RUNNER_TEMP to avoid workspace cleanup issues
@@ -148,8 +304,8 @@ async function run() {
     // Open log file for mitmdump stdout and stderr
     const logFd = fs.openSync(logFile, 'a');
 
-    // Spawn mitmdump process
-    const mitmdumpProcess = spawn('mitmdump', mitmdumpArgs, {
+    // Spawn mitmdump process using the standalone binary path
+    const mitmdumpProcess = spawn(mitmdumpPath, mitmdumpArgs, {
       detached: true,
       stdio: ['ignore', logFd, logFd]
     });
@@ -210,6 +366,7 @@ async function run() {
     core.saveState('mitmproxy-pid', mitmdumpProcess.pid.toString());
     core.saveState('mitmproxy-proxy-url', proxyUrl);
     core.saveState('mitmproxy-cacert-path', certPath);
+    core.saveState('mitmproxy-binary-path', mitmdumpPath);
 
     core.info('mitmproxy setup completed, main action will set outputs');
   } catch (error) {

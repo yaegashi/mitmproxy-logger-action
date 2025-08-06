@@ -12,11 +12,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      # Install Python dependencies first (mitmproxy needs Python)
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
+      # mitmproxy standalone version is automatically downloaded - no Python setup required!
       
       # Start mitmproxy logging
       - name: Start mitmproxy

@@ -169,11 +169,14 @@ async function run() {
       const baseName = path.basename(actualStreamFile, '.mitm');
       harFile = path.join(path.dirname(actualStreamFile), `${baseName}.har`);
       
+      // Get the mitmdump binary path from state (if available)
+      const mitmdumpPath = core.getState('mitmproxy-binary-path') || 'mitmdump';
+      
       core.info('Converting .mitm to .har using mitmdump hardump...');
       try {
         let mitmdumpStdout = '';
         let mitmdumpStderr = '';
-        await exec.exec('mitmdump', [
+        await exec.exec(mitmdumpPath, [
           '--no-server', 
           '--rfile', actualStreamFile, 
           '--set', `hardump=${harFile}`
