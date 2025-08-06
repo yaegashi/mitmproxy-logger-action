@@ -7,6 +7,10 @@ inputs:
     description: 'Enable mitmproxy logging (true/false)'
     required: false
     default: 'true'
+  version:
+    description: 'mitmproxy version to install'
+    required: false
+    default: '12.1.1'
   listen-host:
     description: 'Proxy listen address'
     required: false

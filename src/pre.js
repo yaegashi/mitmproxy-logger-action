@@ -91,7 +91,33 @@ async function installMitmproxyCertificate(mitmproxyDir) {
   }
 }
 
-async function downloadStandaloneMitmproxy() {
+async function installMitmproxyWheel(version) {
+  const wheelUrl = `https://downloads.mitmproxy.org/${version}/mitmproxy-${version}-py3-none-any.whl`;
+  
+  core.info(`Attempting to install mitmproxy ${version} using Python wheel...`);
+  core.info(`Wheel URL: ${wheelUrl}`);
+  
+  try {
+    // Check if python3 is available
+    await exec.exec('python3', ['--version']);
+    core.info('python3 is available');
+    
+    // Try to install the wheel directly using pip
+    await exec.exec('python3', ['-m', 'pip', 'install', wheelUrl, '--user'], { ignoreReturnCode: false });
+    
+    // Verify installation by checking if mitmdump is available
+    await exec.exec('python3', ['-m', 'mitmproxy.tools.mitmdump', '--version']);
+    
+    core.info('Successfully installed mitmproxy using Python wheel');
+    return 'python3 -m mitmproxy.tools.mitmdump';
+    
+  } catch (error) {
+    core.info(`Failed to install mitmproxy wheel: ${error.message}`);
+    throw error;
+  }
+}
+
+async function downloadStandaloneMitmproxy(version) {
   const platform = os.platform();
   const arch = os.arch();
   
@@ -106,55 +132,30 @@ async function downloadStandaloneMitmproxy() {
   let fileName;
   let executableName = 'mitmdump';
   
-  // Try to get the latest version first, fallback to known stable version
-  let version = '10.4.2'; // Fallback version
-  try {
-    core.info('Attempting to get latest mitmproxy version...');
-    let latestVersionOutput = '';
-    await exec.exec('curl', ['-s', 'https://api.github.com/repos/mitmproxy/mitmproxy/releases/latest'], {
-      listeners: {
-        stdout: (data) => {
-          latestVersionOutput += data.toString();
-        }
-      },
-      ignoreReturnCode: true
-    });
-    
-    if (latestVersionOutput) {
-      const releaseData = JSON.parse(latestVersionOutput);
-      if (releaseData.tag_name) {
-        version = releaseData.tag_name.replace('v', '');
-        core.info(`Found latest version: ${version}`);
-      }
-    }
-  } catch (error) {
-    core.info(`Could not fetch latest version, using fallback: ${version}`);
-  }
-  
-  // Determine download URL based on platform
+  // Determine download URL based on platform using downloads.mitmproxy.org
   if (platform === 'linux') {
     if (arch === 'x64') {
-      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-linux-x86_64.tar.gz`;
+      downloadUrl = `https://downloads.mitmproxy.org/${version}/mitmproxy-${version}-linux-x86_64.tar.gz`;
       fileName = `mitmproxy-${version}-linux-x86_64.tar.gz`;
     } else if (arch === 'arm64') {
-      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-linux-aarch64.tar.gz`;
+      downloadUrl = `https://downloads.mitmproxy.org/${version}/mitmproxy-${version}-linux-aarch64.tar.gz`;
       fileName = `mitmproxy-${version}-linux-aarch64.tar.gz`;
     } else {
       throw new Error(`Unsupported Linux architecture: ${arch}. Only x64 and arm64 are supported.`);
     }
   } else if (platform === 'darwin') {
     if (arch === 'x64') {
-      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-macos-x86_64.tar.gz`;
+      downloadUrl = `https://downloads.mitmproxy.org/${version}/mitmproxy-${version}-macos-x86_64.tar.gz`;
       fileName = `mitmproxy-${version}-macos-x86_64.tar.gz`;
     } else if (arch === 'arm64') {
-      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-macos-arm64.tar.gz`;
+      downloadUrl = `https://downloads.mitmproxy.org/${version}/mitmproxy-${version}-macos-arm64.tar.gz`;
       fileName = `mitmproxy-${version}-macos-arm64.tar.gz`;
     } else {
       throw new Error(`Unsupported macOS architecture: ${arch}. Only x64 and arm64 are supported.`);
     }
   } else if (platform === 'win32') {
     if (arch === 'x64') {
-      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-windows-x86_64.zip`;
+      downloadUrl = `https://downloads.mitmproxy.org/${version}/mitmproxy-${version}-windows-x86_64.zip`;
       fileName = `mitmproxy-${version}-windows-x86_64.zip`;
       executableName = 'mitmdump.exe';
     } else {
@@ -169,15 +170,7 @@ async function downloadStandaloneMitmproxy() {
   core.info(`Downloading mitmproxy ${version} standalone from: ${downloadUrl}`);
   
   // Download using curl with retry
-  try {
-    await exec.exec('curl', ['-L', '-o', downloadPath, downloadUrl, '--fail', '--retry', '3']);
-  } catch (error) {
-    core.warning(`Failed to download from snapshots URL, trying GitHub releases...`);
-    // Fallback to GitHub releases
-    const githubUrl = `https://github.com/mitmproxy/mitmproxy/releases/download/v${version}/${fileName}`;
-    core.info(`Trying GitHub releases URL: ${githubUrl}`);
-    await exec.exec('curl', ['-L', '-o', downloadPath, githubUrl, '--fail', '--retry', '3']);
-  }
+  await exec.exec('curl', ['-L', '-o', downloadPath, downloadUrl, '--fail', '--retry', '3']);
   
   core.info(`Downloaded to: ${downloadPath}`);
   
@@ -264,6 +257,7 @@ async function run() {
   try {
     // This is the pre action - install and start mitmproxy
     const enabled = core.getInput('enabled') || 'true';
+    const version = core.getInput('version') || '12.1.1';
     const listenHost = core.getInput('listen-host') || '127.0.0.1';
     const listenPort = core.getInput('listen-port') || '8080';
     const installCacert = core.getInput('install-cacert') || 'true';
@@ -280,13 +274,22 @@ async function run() {
 
     core.info('Starting mitmproxy logger...');
 
-    // Download and install standalone mitmproxy
+    // Try to install mitmproxy using Python wheel first, then fallback to standalone
     let mitmdumpPath;
     try {
-      core.info('Installing mitmproxy standalone version...');
-      mitmdumpPath = await downloadStandaloneMitmproxy();
+      core.info(`Installing mitmproxy version ${version}...`);
+      
+      // First try Python wheel installation
+      try {
+        mitmdumpPath = await installMitmproxyWheel(version);
+        core.info('Successfully installed mitmproxy using Python wheel');
+      } catch (wheelError) {
+        core.info('Python wheel installation failed, trying standalone binary...');
+        mitmdumpPath = await downloadStandaloneMitmproxy(version);
+        core.info('Successfully installed mitmproxy standalone binary');
+      }
     } catch (error) {
-      core.setFailed(`Failed to install mitmproxy standalone: ${error.message}`);
+      core.setFailed(`Failed to install mitmproxy: ${error.message}`);
       return;
     }
 
@@ -318,11 +321,25 @@ async function run() {
     // Open log file for mitmdump stdout and stderr
     const logFd = fs.openSync(logFile, 'a');
 
-    // Spawn mitmdump process using the standalone binary path
-    const mitmdumpProcess = spawn(mitmdumpPath, mitmdumpArgs, {
-      detached: true,
-      stdio: ['ignore', logFd, logFd]
-    });
+    let mitmdumpProcess;
+    
+    // Check if mitmdumpPath is a Python module command or a binary path
+    if (mitmdumpPath.includes('python3 -m')) {
+      // For Python module execution, split the command
+      const args = mitmdumpPath.split(' ').slice(1); // Remove 'python3'
+      args.push(...mitmdumpArgs);
+      
+      mitmdumpProcess = spawn('python3', args, {
+        detached: true,
+        stdio: ['ignore', logFd, logFd]
+      });
+    } else {
+      // For standalone binary execution
+      mitmdumpProcess = spawn(mitmdumpPath, mitmdumpArgs, {
+        detached: true,
+        stdio: ['ignore', logFd, logFd]
+      });
+    }
 
     // Save the PID for cleanup
     fs.writeFileSync(pidFile, mitmdumpProcess.pid.toString());
@@ -371,6 +388,7 @@ async function run() {
 
     // Save state for main action to set outputs (outputs from pre are not accessible in workflows)
     core.saveState('mitmproxy-enabled', enabled);
+    core.saveState('mitmproxy-version', version);
     core.saveState('mitmproxy-listen-host', listenHost);
     core.saveState('mitmproxy-listen-port', listenPort);
     core.saveState('mitmproxy-install-cacert', installCacert);
