@@ -171,12 +171,14 @@ To disable automatic certificate installation:
 ### Ubuntu/macOS
 - Full support for all features
 - **Automatic download of mitmproxy standalone binaries** - no package manager dependencies
+- **Supports both x64 and ARM64 architectures** (including Apple Silicon M1/M2 Macs)
 - Password-protected ZIP encryption using AES-256 encryption
 - Compression using ZIP format
 
 ### Windows
 - Full support for all features  
 - **No Python setup required** - uses standalone mitmproxy binaries
+- **Supports x64 architecture**
 - Password-protected ZIP encryption using AES-256 encryption
 - Compression using ZIP format
 - See `examples/basic-usage-windows.yml` for a complete Windows example

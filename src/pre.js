@@ -136,18 +136,32 @@ async function downloadStandaloneMitmproxy() {
     if (arch === 'x64') {
       downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-linux-x86_64.tar.gz`;
       fileName = `mitmproxy-${version}-linux-x86_64.tar.gz`;
+    } else if (arch === 'arm64') {
+      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-linux-aarch64.tar.gz`;
+      fileName = `mitmproxy-${version}-linux-aarch64.tar.gz`;
     } else {
-      throw new Error(`Unsupported Linux architecture: ${arch}`);
+      throw new Error(`Unsupported Linux architecture: ${arch}. Only x64 and arm64 are supported.`);
     }
   } else if (platform === 'darwin') {
-    downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-macos-x86_64.tar.gz`;
-    fileName = `mitmproxy-${version}-macos-x86_64.tar.gz`;
+    if (arch === 'x64') {
+      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-macos-x86_64.tar.gz`;
+      fileName = `mitmproxy-${version}-macos-x86_64.tar.gz`;
+    } else if (arch === 'arm64') {
+      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-macos-arm64.tar.gz`;
+      fileName = `mitmproxy-${version}-macos-arm64.tar.gz`;
+    } else {
+      throw new Error(`Unsupported macOS architecture: ${arch}. Only x64 and arm64 are supported.`);
+    }
   } else if (platform === 'win32') {
-    downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-windows-x86_64.zip`;
-    fileName = `mitmproxy-${version}-windows-x86_64.zip`;
-    executableName = 'mitmdump.exe';
+    if (arch === 'x64') {
+      downloadUrl = `https://snapshots.mitmproxy.org/${version}/mitmproxy-${version}-windows-x86_64.zip`;
+      fileName = `mitmproxy-${version}-windows-x86_64.zip`;
+      executableName = 'mitmdump.exe';
+    } else {
+      throw new Error(`Unsupported Windows architecture: ${arch}. Only x64 is supported.`);
+    }
   } else {
-    throw new Error(`Unsupported platform: ${platform}`);
+    throw new Error(`Unsupported platform: ${platform}. Only linux, darwin, and win32 are supported.`);
   }
   
   const downloadPath = path.join(mitmproxyStandaloneDir, fileName);
