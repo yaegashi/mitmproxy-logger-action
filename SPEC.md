@@ -49,8 +49,10 @@ The `install-certificate` feature provides automatic CA certificate installation
 
 #### Environment Variables
 
-Additionally sets environment variables for applications:
-- `CURL_HOME`: Specifies the location of `.curlrc` for setting `ssl-no-revoke` (Windows only)
+When `set-envvars` is enabled, automatically sets environment variables for applications:
+- `http_proxy`: Proxy URL for HTTP traffic
+- `https_proxy`: Proxy URL for HTTPS traffic  
+- `CURL_CA_BUNDLE`: Path to the CA certificate file (Windows only, when CA certificate is available)
 
 ### 3. Stream Capture
 
@@ -61,7 +63,7 @@ Additionally sets environment variables for applications:
 
 ### 4. Artifact Management
 
-- **Compression**: Password-protected ZIP archive using yazl library
+- **Compression**: Password-protected ZIP archive using built-in Node.js compression
 - **Encryption**: Built-in ZIP encryption with passphrase protection
 - **Contents**: Stream files (.mitm, .har), logs, CA certificates
 - **Upload**: GitHub Actions artifact API for secure storage
@@ -165,7 +167,6 @@ Verify certificate installation on each supported platform:
 - `@actions/core`: GitHub Actions runtime API
 - `@actions/exec`: Process execution utilities  
 - `@actions/artifact`: Artifact upload API
-- `yazl`: ZIP archive creation with password protection
 - `@vercel/ncc`: Bundling for distribution
 
 ## Future Enhancements

@@ -68,12 +68,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # Setup Python (required for mitmproxy)
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-      
       # Start mitmproxy logging
       - name: Start mitmproxy
         id: mitmproxy
@@ -142,7 +136,7 @@ The action automatically installs mitmproxy's CA certificate to the system trust
 When `set-envvars` is set to `true` (default), the action automatically sets these proxy environment variables:
 - `http_proxy`: Set to the proxy URL (e.g., `http://127.0.0.1:8080`)  
 - `https_proxy`: Set to the proxy URL (e.g., `http://127.0.0.1:8080`)
-- `CURL_HOME`: Specifies the location of `.curlrc` for setting `ssl-no-revoke` (Windows only)
+- `CURL_CA_BUNDLE`: Path to the CA certificate file (Windows only, when CA certificate is available)
 
 ### Disabling Environment Variables
 
@@ -177,7 +171,6 @@ To disable automatic certificate installation:
 
 ### Windows
 - Full support for all features  
-- **Note:** Requires Python to be available (use `actions/setup-python@v4`)
 - Password-protected ZIP encryption using AES-256 encryption
 - Compression using ZIP format
 - See `examples/basic-usage-windows.yml` for a complete Windows example
@@ -265,61 +258,6 @@ mitmweb -r stream_*.mitm
 To see detailed logs, check the uploaded artifacts which include:
 - `mitmdump.log` - mitmproxy startup and operation logs
 - Stream data file with all captured HTTP/HTTPS requests
-
-### Testing Locally
-
-You can test the action locally by running the Node.js scripts directly:
-
-```bash
-# Set up environment variables
-export INPUT_ENABLED="true"
-export INPUT_LISTEN_HOST="127.0.0.1"
-export INPUT_LISTEN_PORT="8080"
-export INPUT_INSTALL_CERTIFICATE="true"
-export INPUT_PASSPHRASE="your-test-passphrase"
-export RUNNER_TEMP="/tmp"
-
-# Install dependencies
-npm install
-
-# Build the action
-npm run build
-
-# Start mitmproxy (pre action)
-node dist/pre/index.js
-
-# Test proxy
-curl -x http://127.0.0.1:8080 http://httpbin.org/get
-
-# Stop and upload (post action)
-node dist/post/index.js
-```
-
-On Windows PowerShell:
-```powershell
-# Set up environment variables
-$env:INPUT_ENABLED = "true"
-$env:INPUT_LISTEN_HOST = "127.0.0.1"
-$env:INPUT_LISTEN_PORT = "8080"
-$env:INPUT_INSTALL_CERTIFICATE = "true"
-$env:INPUT_PASSPHRASE = "your-test-passphrase"
-$env:RUNNER_TEMP = "$env:TEMP"
-
-# Install dependencies
-npm install
-
-# Build the action
-npm run build
-
-# Start mitmproxy (pre action)
-node dist/pre/index.js
-
-# Test proxy
-Invoke-WebRequest -Uri "http://httpbin.org/get" -Proxy "http://127.0.0.1:8080" -UseBasicParsing
-
-# Stop and upload (post action)  
-node dist/post/index.js
-```
 
 ## License
 

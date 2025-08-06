@@ -27,7 +27,7 @@ async function run() {
       core.exportVariable('CURL_HOME', '');
       core.info('Unset environment variables: http_proxy, https_proxy, CURL_HOME');
     }
-    
+
     // This is the post action - stop mitmproxy and upload artifacts
     const enabled = core.getInput('enabled') || 'true';
     const passphrase = core.getInput('passphrase');
@@ -43,7 +43,7 @@ async function run() {
     const streamFile = core.getState('mitmproxy-stream-file');
     const savedPid = core.getState('mitmproxy-pid');
     let mitmproxyDir = core.getState('mitmproxy-dir');
-    
+
     // If not available in state, construct the expected path in RUNNER_TEMP
     if (!mitmproxyDir) {
       const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
@@ -64,10 +64,10 @@ async function run() {
       pid = fs.readFileSync(pidFile, 'utf8').trim();
       core.info(`Using PID from file: ${pid}`);
     }
-    
+
     if (pid) {
       core.info(`Stopping mitmdump process (PID: ${pid})...`);
-      
+
       try {
         if (os.platform() === 'win32') {
           // Windows: graceful shutdown with SIGINT, then force kill if needed
@@ -99,7 +99,7 @@ async function run() {
             // Process is running, try to kill it gracefully
             await exec.exec('kill', ['-TERM', pid], { ignoreReturnCode: true });
             await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
-            
+
             // Check if still running and force kill if needed
             const { exitCode: stillRunning } = await exec.getExecOutput('kill', ['-0', pid], { ignoreReturnCode: true });
             if (stillRunning === 0) {
@@ -107,7 +107,7 @@ async function run() {
             }
           }
         }
-        
+
         // Clean up PID file
         if (fs.existsSync(pidFile)) {
           fs.unlinkSync(pidFile);
@@ -131,15 +131,15 @@ async function run() {
     const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
     const runNumber = process.env.GITHUB_RUN_NUMBER || 'unknown';
     const archiveName = `mitmproxy_stream_${timestamp}`;
-    
+
     // Get custom artifact name or use default
     const customArtifactName = core.getInput('artifact-name') || '';
     const defaultArtifactName = `mitmproxy_stream_artifact_${runNumber}`;
     const artifactName = customArtifactName || defaultArtifactName;
-    
+
     // Find the stream file - use state only (no file system search)
     let actualStreamFile = streamFile;
-    
+
     if (!actualStreamFile) {
       // Check for any .mitm files in the mitmproxy directory
       core.info('Checking for any stream files in directory...');
@@ -168,14 +168,14 @@ async function run() {
     if (actualStreamFile && fs.existsSync(actualStreamFile)) {
       const baseName = path.basename(actualStreamFile, '.mitm');
       harFile = path.join(path.dirname(actualStreamFile), `${baseName}.har`);
-      
+
       core.info('Converting .mitm to .har using mitmdump hardump...');
       try {
         let mitmdumpStdout = '';
         let mitmdumpStderr = '';
         await exec.exec('mitmdump', [
-          '--no-server', 
-          '--rfile', actualStreamFile, 
+          '--no-server',
+          '--rfile', actualStreamFile,
           '--set', `hardump=${harFile}`
         ], {
           listeners: {
@@ -216,14 +216,14 @@ async function run() {
     // Create encrypted ZIP archive with both .mitm and .har files
     core.info('Creating password-protected ZIP archive...');
     const zipFile = path.join(artifactDir, `${archiveName}.zip`);
-    
+
     await new Promise((resolve, reject) => {
       const output = fs.createWriteStream(zipFile);
       const archive = archiver('zip-encrypted', {
         encryptionMethod: 'aes256',
         password: passphrase
       });
-      
+
       output.on('close', () => {
         core.info(`Password-protected ZIP archive created: ${zipFile}`);
         // Use fs.statSync to get the actual file size on disk, as archive.pointer() may not account for encryption overhead or final ZIP structure.
@@ -231,31 +231,31 @@ async function run() {
         core.info(`Archive size: ${stats.size} bytes`);
         resolve();
       });
-      
+
       output.on('error', reject);
       archive.on('error', reject);
-      
+
       archive.pipe(output);
-      
+
       // Add .mitm file with encryption
       if (actualStreamFile && fs.existsSync(actualStreamFile)) {
         archive.file(actualStreamFile, { name: path.basename(actualStreamFile) });
         core.info(`Added encrypted to ZIP: ${path.basename(actualStreamFile)}`);
       }
-      
+
       // Add .har file with encryption
       if (harFile && fs.existsSync(harFile)) {
         archive.file(harFile, { name: path.basename(harFile) });
         core.info(`Added encrypted to ZIP: ${path.basename(harFile)}`);
       }
-      
+
       // Add logs if available with encryption
       const logFile = path.join(mitmproxyDir, 'mitmdump.log');
       if (fs.existsSync(logFile)) {
         archive.file(logFile, { name: 'mitmdump.log' });
         core.info('Added encrypted mitmdump log file to ZIP');
       }
-      
+
       archive.finalize();
     });
 
@@ -265,11 +265,11 @@ async function run() {
     try {
       const artifactClient = new artifact.DefaultArtifactClient();
       const files = [finalFile];
-      
+
       core.info(`Uploading artifacts: ${files.map(f => path.basename(f)).join(', ')}`);
       core.info(`Artifact root directory: ${artifactDir}`);
       core.info(`Total files to upload: ${files.length}`);
-      
+
       // Check if files exist and are readable
       for (const file of files) {
         if (!fs.existsSync(file)) {
@@ -278,7 +278,7 @@ async function run() {
         const stats = fs.statSync(file);
         core.info(`File ${path.basename(file)}: ${stats.size} bytes`);
       }
-      
+
       // Use the correct API call format for @actions/artifact v2.x
       const uploadResponse = await artifactClient.uploadArtifact(
         artifactName,     // artifact name

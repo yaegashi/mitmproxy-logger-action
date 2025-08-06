@@ -67,32 +67,28 @@ jobs:
             echo "✅ SUCCESS: https_proxy is set to: $https_proxy"
           fi
 
-          # Only check CURL_HOME on Windows runners
+          # Only check CURL_CA_BUNDLE on Windows runners (when CA certificate is available)
           if [ "${{ runner.os }}" = "Windows" ]; then
-            if [ -z "$CURL_HOME" ]; then
-              echo "❌ ERROR: CURL_HOME environment variable not set!"
-              exit 1
-            else
-              echo "✅ SUCCESS: CURL_HOME is set to: $CURL_HOME"
-
-              # Check if .curlrc file exists and contains expected content
-              curlrc_path="$CURL_HOME/.curlrc"
-              if [ -f "$curlrc_path" ]; then
-                curlrc_content=$(cat "$curlrc_path")
-                if echo "$curlrc_content" | grep -q "ssl-no-revoke"; then
-                  echo "✅ SUCCESS: .curlrc file contains ssl-no-revoke"
+            if [ -n "${{ steps.mitmproxy-with-envvars.outputs.cacert-path }}" ]; then
+              if [ -z "$CURL_CA_BUNDLE" ]; then
+                echo "❌ ERROR: CURL_CA_BUNDLE environment variable not set!"
+                exit 1
+              else
+                echo "✅ SUCCESS: CURL_CA_BUNDLE is set to: $CURL_CA_BUNDLE"
+                
+                # Verify that the CA certificate file exists
+                if [ -f "$CURL_CA_BUNDLE" ]; then
+                  echo "✅ SUCCESS: CA certificate file exists at $CURL_CA_BUNDLE"
                 else
-                  echo "❌ ERROR: .curlrc file does not contain ssl-no-revoke"
-                  echo "Content: $curlrc_content"
+                  echo "❌ ERROR: CA certificate file not found at $CURL_CA_BUNDLE"
                   exit 1
                 fi
-              else
-                echo "❌ ERROR: .curlrc file not found at $curlrc_path"
-                exit 1
               fi
+            else
+              echo "ℹ️ No CA certificate available, skipping CURL_CA_BUNDLE check"
             fi
           else
-            echo "ℹ️ Skipping CURL_HOME check on non-Windows runner (${{ runner.os }})"
+            echo "ℹ️ Skipping CURL_CA_BUNDLE check on non-Windows runner (${{ runner.os }})"
           fi
 
   test-set-envvars-disabled:
@@ -154,14 +150,14 @@ jobs:
             echo "✅ SUCCESS: https_proxy is not set (as expected)"
           fi
 
-          # Only check CURL_HOME on Windows runners
+          # Only check CURL_CA_BUNDLE on Windows runners (should not be set when set-envvars=false)
           if [ "${{ runner.os }}" = "Windows" ]; then
-            if [ -n "$CURL_HOME" ]; then
-              echo "❌ ERROR: CURL_HOME environment variable should not be set but is: $CURL_HOME"
+            if [ -n "$CURL_CA_BUNDLE" ]; then
+              echo "❌ ERROR: CURL_CA_BUNDLE environment variable should not be set but is: $CURL_CA_BUNDLE"
               exit 1
             else
-              echo "✅ SUCCESS: CURL_HOME is not set (as expected)"
+              echo "✅ SUCCESS: CURL_CA_BUNDLE is not set (as expected)"
             fi
           else
-            echo "ℹ️ Skipping CURL_HOME check on non-Windows runner (${{ runner.os }})"
+            echo "ℹ️ Skipping CURL_CA_BUNDLE check on non-Windows runner (${{ runner.os }})"
           fi
