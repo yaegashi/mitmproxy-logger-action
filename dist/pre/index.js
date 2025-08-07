@@ -27648,31 +27648,7 @@ async function installMitmproxyCertificate(mitmproxyDir) {
   }
 }
 
-async function installMitmproxyWheel(version) {
-  const wheelUrl = `https://downloads.mitmproxy.org/${version}/mitmproxy-${version}-py3-none-any.whl`;
-  
-  core.info(`Attempting to install mitmproxy ${version} using Python wheel...`);
-  core.info(`Wheel URL: ${wheelUrl}`);
-  
-  try {
-    // Check if python3 is available
-    await exec.exec('python3', ['--version']);
-    core.info('python3 is available');
-    
-    // Try to install the wheel directly using pip
-    await exec.exec('python3', ['-m', 'pip', 'install', wheelUrl, '--user'], { ignoreReturnCode: false });
-    
-    // Verify installation by checking if mitmdump is available
-    await exec.exec('python3', ['-m', 'mitmproxy.tools.mitmdump', '--version']);
-    
-    core.info('Successfully installed mitmproxy using Python wheel');
-    return 'python3 -m mitmproxy.tools.mitmdump';
-    
-  } catch (error) {
-    core.info(`Failed to install mitmproxy wheel: ${error.message}`);
-    throw error;
-  }
-}
+
 
 async function downloadStandaloneMitmproxy(version) {
   const platform = os.platform();
@@ -27831,20 +27807,12 @@ async function run() {
 
     core.info('Starting mitmproxy logger...');
 
-    // Try to install mitmproxy using Python wheel first, then fallback to standalone
+    // Download and install mitmproxy standalone binary
     let mitmdumpPath;
     try {
       core.info(`Installing mitmproxy version ${version}...`);
-      
-      // First try Python wheel installation
-      try {
-        mitmdumpPath = await installMitmproxyWheel(version);
-        core.info('Successfully installed mitmproxy using Python wheel');
-      } catch (wheelError) {
-        core.info('Python wheel installation failed, trying standalone binary...');
-        mitmdumpPath = await downloadStandaloneMitmproxy(version);
-        core.info('Successfully installed mitmproxy standalone binary');
-      }
+      mitmdumpPath = await downloadStandaloneMitmproxy(version);
+      core.info('Successfully installed mitmproxy standalone binary');
     } catch (error) {
       core.setFailed(`Failed to install mitmproxy: ${error.message}`);
       return;
@@ -27880,23 +27848,11 @@ async function run() {
 
     let mitmdumpProcess;
     
-    // Check if mitmdumpPath is a Python module command or a binary path
-    if (mitmdumpPath.includes('python3 -m')) {
-      // For Python module execution, split the command
-      const args = mitmdumpPath.split(' ').slice(1); // Remove 'python3'
-      args.push(...mitmdumpArgs);
-      
-      mitmdumpProcess = spawn('python3', args, {
-        detached: true,
-        stdio: ['ignore', logFd, logFd]
-      });
-    } else {
-      // For standalone binary execution
-      mitmdumpProcess = spawn(mitmdumpPath, mitmdumpArgs, {
-        detached: true,
-        stdio: ['ignore', logFd, logFd]
-      });
-    }
+    // Execute standalone binary
+    mitmdumpProcess = spawn(mitmdumpPath, mitmdumpArgs, {
+      detached: true,
+      stdio: ['ignore', logFd, logFd]
+    });
 
     // Save the PID for cleanup
     fs.writeFileSync(pidFile, mitmdumpProcess.pid.toString());
