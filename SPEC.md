@@ -25,7 +25,7 @@ Communication between lifecycle hooks uses:
 
 ### 1. Proxy Server Management
 
-- **Installation**: Automatic mitmproxy installation via pip if not present
+- **Installation**: Automatic mitmproxy standalone binary download from official sources
 - **Startup**: Background mitmdump process with configurable host/port
 - **Cleanup**: Graceful process termination with fallback to force kill
 
@@ -61,7 +61,7 @@ Additionally sets environment variables for applications:
 
 ### 4. Artifact Management
 
-- **Compression**: Password-protected ZIP archive using yazl library
+- **Compression**: Password-protected ZIP archive using built-in compression
 - **Encryption**: Built-in ZIP encryption with passphrase protection
 - **Contents**: Stream files (.mitm, .har), logs, CA certificates
 - **Upload**: GitHub Actions artifact API for secure storage
@@ -73,6 +73,7 @@ Additionally sets environment variables for applications:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `enabled` | boolean | `true` | Enable/disable mitmproxy logging |
+| `version` | string | `12.1.1` | mitmproxy version to install |
 | `listen-host` | string | `127.0.0.1` | Proxy server bind address |
 | `listen-port` | string | `8080` | Proxy server port |
 | `install-cacert` | boolean | `true` | Install CA certificate to system trust store |
@@ -127,45 +128,11 @@ npm run build
 
 This creates bundled distributions in `dist/` directory using ncc.
 
-### Testing Locally
-
-Set environment variables and run individual hooks:
-
-```bash
-export INPUT_ENABLED="true"
-export INPUT_LISTEN_HOST="127.0.0.1" 
-export INPUT_LISTEN_PORT="8080"
-export INPUT_INSTALL_CACERT="true"
-export INPUT_PASSPHRASE="test-passphrase"
-export RUNNER_TEMP="/tmp"
-
-# Start proxy
-node dist/pre/index.js
-
-# Set outputs  
-node dist/main/index.js
-
-# Test stream capture
-curl -x http://127.0.0.1:8080 http://httpbin.org/get
-
-# Cleanup and upload
-node dist/post/index.js
-```
-
-### Platform Testing
-
-Verify certificate installation on each supported platform:
-
-- **Ubuntu**: Check `/usr/local/share/ca-certificates/` and run `update-ca-certificates`
-- **macOS**: Verify keychain trust settings with `security find-certificate`
-- **Windows**: Check certificate store with `certutil -store Root`
-
 ### Dependencies
 
 - `@actions/core`: GitHub Actions runtime API
 - `@actions/exec`: Process execution utilities  
 - `@actions/artifact`: Artifact upload API
-- `yazl`: ZIP archive creation with password protection
 - `@vercel/ncc`: Bundling for distribution
 
 ## Future Enhancements

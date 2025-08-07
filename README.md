@@ -6,15 +6,18 @@ A GitHub Action that automatically captures HTTP/HTTPS traffic using mitmproxy d
 
 ## Features
 
-- Starts mitmdump proxy on specified host/port
+- Starts mitmdump proxy on specified host/port using **standalone mitmproxy binaries**
 - Logs all HTTP/HTTPS traffic to a file
 - **Automatic CA certificate installation** for seamless HTTPS interception
+- **Automatic download of specified mitmproxy version** - no Python dependencies required
+- **Version control** - specify exact mitmproxy version for reproducible builds
 - Compresses and encrypts traffic logs with a passphrase
 - Uploads traffic data as GitHub Actions artifacts
 - Configurable proxy settings
 - Easy cleanup and artifact management
 - **Cross-platform support** (Ubuntu, macOS, Windows)
 - **Pure Node.js implementation** (no bash scripts required)
+- **No runner environment dependencies** - uses self-contained mitmproxy binaries
 
 ## Usage
 
@@ -68,11 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # Setup Python (required for mitmproxy)
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
+      # mitmproxy standalone version is automatically downloaded - no Python setup required!
       
       # Start mitmproxy logging
       - name: Start mitmproxy
@@ -113,6 +112,7 @@ The action automatically handles:
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
 | `enabled` | Enable mitmproxy logging (true/false) | No | `true` |
+| `version` | mitmproxy version to install | No | `12.1.1` |
 | `listen-host` | Proxy listen address | No | `127.0.0.1` |
 | `listen-port` | Proxy listen port | No | `8080` |
 | `install-cacert` | Install mitmproxy CA certificate to system trust store (true/false) | No | `true` |
@@ -172,12 +172,15 @@ To disable automatic certificate installation:
 
 ### Ubuntu/macOS
 - Full support for all features
+- **Automatic download of mitmproxy standalone binaries** - no package manager dependencies
+- **Supports both x64 and ARM64 architectures** (including Apple Silicon M1/M2 Macs)
 - Password-protected ZIP encryption using AES-256 encryption
 - Compression using ZIP format
 
 ### Windows
 - Full support for all features  
-- **Note:** Requires Python to be available (use `actions/setup-python@v4`)
+- **No Python setup required** - uses standalone mitmproxy binaries
+- **Supports x64 architecture**
 - Password-protected ZIP encryption using AES-256 encryption
 - Compression using ZIP format
 - See `examples/basic-usage-windows.yml` for a complete Windows example
@@ -221,12 +224,13 @@ mitmweb -r stream_*.mitm
     passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
 ```
 
-### Custom Port Configuration
+### Custom Version and Port Configuration
 
 ```yaml
 - name: Start mitmproxy
   uses: yaegashi/mitmproxy-logger-action@v1
   with:
+    version: '12.1.1'       # Specify mitmproxy version
     listen-host: '0.0.0.0'  # Listen on all interfaces
     listen-port: '9090'     # Custom port
     passphrase: ${{ secrets.MITMPROXY_PASSPHRASE }}
@@ -265,61 +269,6 @@ mitmweb -r stream_*.mitm
 To see detailed logs, check the uploaded artifacts which include:
 - `mitmdump.log` - mitmproxy startup and operation logs
 - Stream data file with all captured HTTP/HTTPS requests
-
-### Testing Locally
-
-You can test the action locally by running the Node.js scripts directly:
-
-```bash
-# Set up environment variables
-export INPUT_ENABLED="true"
-export INPUT_LISTEN_HOST="127.0.0.1"
-export INPUT_LISTEN_PORT="8080"
-export INPUT_INSTALL_CERTIFICATE="true"
-export INPUT_PASSPHRASE="your-test-passphrase"
-export RUNNER_TEMP="/tmp"
-
-# Install dependencies
-npm install
-
-# Build the action
-npm run build
-
-# Start mitmproxy (pre action)
-node dist/pre/index.js
-
-# Test proxy
-curl -x http://127.0.0.1:8080 http://httpbin.org/get
-
-# Stop and upload (post action)
-node dist/post/index.js
-```
-
-On Windows PowerShell:
-```powershell
-# Set up environment variables
-$env:INPUT_ENABLED = "true"
-$env:INPUT_LISTEN_HOST = "127.0.0.1"
-$env:INPUT_LISTEN_PORT = "8080"
-$env:INPUT_INSTALL_CERTIFICATE = "true"
-$env:INPUT_PASSPHRASE = "your-test-passphrase"
-$env:RUNNER_TEMP = "$env:TEMP"
-
-# Install dependencies
-npm install
-
-# Build the action
-npm run build
-
-# Start mitmproxy (pre action)
-node dist/pre/index.js
-
-# Test proxy
-Invoke-WebRequest -Uri "http://httpbin.org/get" -Proxy "http://127.0.0.1:8080" -UseBasicParsing
-
-# Stop and upload (post action)  
-node dist/post/index.js
-```
 
 ## License
 
